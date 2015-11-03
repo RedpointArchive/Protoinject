@@ -1,0 +1,10 @@
+# Ignore these files.
+bin
+obj
+*.sln
+*.csproj
+*.nupkg
+*.userprefs
+*.suo
+*.user
+*.speccache
