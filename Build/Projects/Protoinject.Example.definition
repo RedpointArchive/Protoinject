@@ -2,7 +2,9 @@
 <Project Name="Protoinject.Example" Path="Protoinject.Example" Type="Console">
   <References>
     <Reference Include="System" />
-	<Reference Include="Protoinject" />
+    <Reference Include="Protoinject" />
   </References>
-  <Files />
+  <Files>
+    <Compile Include="Program.cs" />
+  </Files>
 </Project>

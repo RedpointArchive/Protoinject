@@ -3,5 +3,12 @@
   <References>
     <Reference Include="System" />
   </References>
-  <Files />
+  <Files>
+    <Compile Include="ActivationException.cs" />
+    <Compile Include="IMapping.cs" />
+    <Compile Include="INode.cs" />
+    <Compile Include="IScope.cs" />
+    <Compile Include="ISetNodeName.cs" />
+    <Compile Include="StandardKernel.cs" />
+  </Files>
 </Project>
