@@ -11,15 +11,30 @@ namespace Protoinject.Example
         public static void Main(string[] args)
         {
             var kernel = new StandardKernel();
+
             var controllers = kernel.CreateScopeFromNode(kernel.CreateEmptyNode("Controllers"));
-            kernel.Bind<IInput, DefaultInput>(scope: controllers, reuse: true);
-            kernel.Bind<IMovement, DefaultMovement>(scope: controllers, reuse: true);
-            kernel.Bind<IWorld, DefaultWorld>();
-            kernel.Bind<IPlayer, Player>();
+            kernel.Bind<IInput>().To<DefaultInput>().InScope(controllers).EnforceOnePerScope();
+            kernel.Bind<IMovement>().To<DefaultMovement>().InScope(controllers).EnforceOnePerScope();
 
-            var world = kernel.Get<IWorld>();
+            var gameSessionNode = kernel.CreateEmptyNode("GameSession");
+            var gameSession = kernel.CreateScopeFromNode(gameSessionNode);
+            var networking = kernel.CreateScopeFromNode(kernel.CreateEmptyNode("Networking", gameSessionNode));
+            var profiling = kernel.CreateScopeFromNode(kernel.CreateEmptyNode("Profiling", gameSessionNode));
 
-            foreach (var root in kernel.GetRootHierarchies())
+            kernel.Bind<IProfiler>().To<DefaultProfiler>().InScope(profiling).EnforceOnePerScope();
+            kernel.Bind<IProfilerUtil>().To<DefaultProfilerUtil>().InScope(profiling).EnforceOnePerScope();
+
+            kernel.Bind<INetworkingSession>().To<NetworkingSession>().InScope(networking).EnforceOnePerScope();
+            kernel.Bind<INetworkingPlayer>().To<NetworkingPlayer>().InScope(networking);
+
+            kernel.Bind<IWorld>().To<DefaultWorld>();
+            kernel.Bind<IPlayer>().To<Player>();
+
+            var worldPlan = kernel.Plan<IWorld>();
+            kernel.Validate(worldPlan);
+            //var world = kernel.Resolve(worldPlan);
+
+            foreach (var root in kernel.Hierarchy.RootNodes)
             {
                 Console.Write(root.GetDebugRepresentation());
             }
@@ -39,77 +54,49 @@ namespace Protoinject.Example
             {
                 return string.Empty;
             }
-            var me = indent + "* " + current.Name;
+            var me = (indent + "* " + current.Name).TrimEnd();
             if (current.Type != null)
             {
                 me += " (" + current.Type.FullName + ")";
+            }
+            if (current.Planned)
+            {
+                me += " **PLANNED**";
             }
             me += Environment.NewLine;
             foreach (var c in current.Children)
             {
                 me += GetDebugRepresentation(c, indent + "  ");
             }
+            if (current.Planned)
+            {
+                foreach (var p in current.PlannedConstructorArguments)
+                {
+                    me += GetDebugRepresentation(p, indent + "  ");
+                }
+            }
             return me;
         }
-    }
 
-    public interface IWorld
-    {
-    }
-
-    public class DefaultWorld : IWorld
-    {
-        public DefaultWorld(Func<string, Player> playerFactory, ISetNodeName setNodeName)
+        private static string GetDebugRepresentation(IUnresolvedArgument current, string indent)
         {
-            playerFactory("Player1");
-            playerFactory("Player2");
-        }
-    }
-
-    public interface IInventory
-    {
-    }
-
-    public class DefaultInventory
-    {
-    }
-
-    public interface IInput
-    {
-    }
-
-    public class DefaultInput : IInput
-    {
-    }
-
-    public interface IMovement
-    {
-    }
-
-    public class DefaultMovement : IMovement
-    {
-        public DefaultMovement(IInput input, ISetNodeName setNodeName)
-        {
-            setNodeName.SetName(Program.GetRandomName());
-        }
-    }
-
-    public interface IEntity
-    {
-    }
-
-    public class Entity : IEntity
-    {
-    }
-
-    public interface IPlayer
-    { }
-
-    public class Player : Entity, IPlayer
-    {
-        public Player(IMovement movement, ISetNodeName setNodeName, string name)
-        {
-            setNodeName.SetName(name);
+            indent = indent ?? string.Empty;
+            if (current == null)
+            {
+                return string.Empty;
+            }
+            var me = (indent + "- " + current.ParameterName).TrimEnd();
+            me += " (" + current.ArgumentType.ToString() + ")";
+            if (current.UnresolvedType != null)
+            {
+                me += " (" + current.UnresolvedType.FullName + ")";
+            }
+            if (current.PlannedTarget != null)
+            {
+                me += " -> " + current.PlannedTarget.FullName;
+            }
+            me += Environment.NewLine;
+            return me;
         }
     }
 }

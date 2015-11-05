@@ -3,22 +3,25 @@ using System.Collections.Generic;
 
 namespace Protoinject
 {
-    public interface INode
+    public interface INode : IPlan
     {
         INode Parent { get; }
 
         string Name { get; set; }
 
         IReadOnlyCollection<INode> Children { get; }
-        
-        string FullName { get; }
 
-        object Value { get; }
+        object UntypedValue { get; }
 
         Type Type { get; }
 
-        T GetValue<T>();
-
         IReadOnlyCollection<INode> GetParents();
+
+        bool Planned { get; }
+    }
+
+    public interface INode<out T> : INode, IPlan<T>
+    {
+        T Value { get; }
     }
 }

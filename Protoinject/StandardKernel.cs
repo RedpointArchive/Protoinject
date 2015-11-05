@@ -3,58 +3,277 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace Protoinject
 {
-    public class StandardKernel
+    public class StandardKernel : IKernel
     {
         private Dictionary<Type, List<IMapping>> _bindings;
 
-        public List<INode> _rootHierarchies;
+        private DefaultHierarchy _hierarchy;
 
         public StandardKernel()
         {
             _bindings = new Dictionary<Type, List<IMapping>>();
-            _rootHierarchies = new List<INode>();
+            _hierarchy = new DefaultHierarchy();
         }
 
-        public void Bind<TInterface, TImplementation>(INode descendantFilter = null, IScope scope = null, bool reuse = false) where TImplementation : TInterface
+        public IBindToInScopeWithDescendantFilterOrUnique<TInterface> Bind<TInterface>()
         {
-            var list = _bindings.ContainsKey(typeof (TInterface))
-                ? _bindings[typeof (TInterface)]
-                : new List<IMapping>();
-            list.Add(new DefaultMapping(typeof(TImplementation), descendantFilter, scope, reuse));
-            if (list.Count == 1)
+            List<IMapping> list;
+            if (!_bindings.ContainsKey(typeof (TInterface)))
             {
+                list = new List<IMapping>();
                 _bindings[typeof (TInterface)] = list;
             }
+            else
+            {
+                list = _bindings[typeof (TInterface)];
+            }
+            var mapping = new DefaultMapping();
+            mapping.Target = typeof (TInterface);
+            list.Add(mapping);
+            return new DefaultBindToInScopeWithDescendantFilterOrUnique<TInterface>(mapping);
         }
 
-        public IReadOnlyCollection<INode> GetRootHierarchies()
+        public IHierarchy Hierarchy => _hierarchy;
+
+        public IPlan<T> Plan<T>(INode current = null)
         {
-            return _rootHierarchies.AsReadOnly();
+            return (IPlan<T>) Plan(typeof (T), current);
         }
 
-        public T Get<T>(INode current = null)
+        public IPlan Plan(Type t, INode current = null, object[] additionalConstructorObjects = null)
         {
-            return (T)Get(typeof (T), current);
+            return CreatePlan(t, current, additionalConstructorObjects);
         }
 
-        public object Get(Type t, INode current = null, object[] additionalConstructorObjects = null)
+        public void Validate<T>(IPlan<T> plan)
         {
-            List<IMapping> matchingBindings;
+            Validate((IPlan)plan);
+        }
+
+        public void Validate(IPlan plan)
+        {
+        }
+
+        public T Resolve<T>(IPlan<T> plan)
+        {
+            return ResolveToNode(plan).Value;
+        }
+
+        public object Resolve(IPlan plan)
+        {
+            return ResolveToNode(plan).UntypedValue;
+        }
+
+        public INode<T> ResolveToNode<T>(IPlan<T> plan)
+        {
+            return (INode<T>) ResolveToNode((IPlan) plan);
+        }
+
+        public INode ResolveToNode(IPlan plan)
+        {
+            return null;
+        }
+
+        private IPlan CreatePlan(Type requestedType, INode current = null, object[] additionalConstructorObjects = null)
+        {
+            var resolvedMapping = ResolveType(requestedType, current);
+
+            var scopeNode = current;
+            if (resolvedMapping.LifetimeScope != null)
+            {
+                scopeNode = resolvedMapping.LifetimeScope.GetContainingNode();
+            }
+
+            if (scopeNode != null && resolvedMapping.UniquePerScope)
+            {
+                var existing = scopeNode.Children.FirstOrDefault(x => x.Type.IsAssignableFrom(resolvedMapping.Target));
+                if (existing != null)
+                {
+                    return existing;
+                }
+            }
+
+            var nodeToCreate = typeof (DefaultNode<>).MakeGenericType(resolvedMapping.Target);
+            var createdNode = (DefaultNode) Activator.CreateInstance(nodeToCreate);
+            createdNode.Name = string.Empty;
+            createdNode.Parent = scopeNode;
+            createdNode.Planned = true;
+            createdNode.Type = resolvedMapping.Target;
+
+            // If the type is System.Func or similar, create it as a factory.
+            if (resolvedMapping.Target.FullName.StartsWith("System.Func`"))
+            {
+                createdNode.PlannedConstructor = null;
+                createdNode.UntypedValue = CreateFuncFactory(createdNode.Type, current);
+                return createdNode;
+            }
+
+            createdNode.PlannedConstructor =
+                createdNode.Type.GetConstructors(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault();
+            if (createdNode.PlannedConstructor == null)
+            {
+                // This node won't be valid because it's planned, has no value and
+                // has no constructor.
+                return createdNode;
+            }
+
+            createdNode.PlannedConstructorArguments = new List<IUnresolvedArgument>();
+
+            var parameters = createdNode.PlannedConstructor.GetParameters();
+            var paramCount = parameters.Length - (additionalConstructorObjects?.Length ?? 0);
+            for (var i = 0; i < paramCount; i++)
+            {
+                var parameter = parameters[i];
+
+                var plannedArgument = new DefaultUnresolvedArgument();
+                plannedArgument.ParameterName = parameter.Name;
+
+                if (parameter.ParameterType == typeof (ICurrentNode))
+                {
+                    plannedArgument.ArgumentType = UnresolvedArgumentType.CurrentNode;
+                    plannedArgument.CurrentNode = new DefaultCurrentNode(createdNode);
+                }
+                else if (parameter.ParameterType.FullName.StartsWith("System.Func`"))
+                {
+                    plannedArgument.ArgumentType = UnresolvedArgumentType.Factory;
+                    plannedArgument.UnresolvedType = parameter.ParameterType;
+                    plannedArgument.FactoryDelegate = CreateFuncFactory(plannedArgument.UnresolvedType, current);
+                    plannedArgument.FactoryType = plannedArgument.FactoryDelegate.Method.ReturnType;
+                }
+                else
+                {
+                    plannedArgument.ArgumentType = UnresolvedArgumentType.Type;
+                    plannedArgument.UnresolvedType = parameters[i].ParameterType;
+                }
+
+                createdNode.PlannedConstructorArguments.Add(plannedArgument);
+            }
+
+            if (additionalConstructorObjects != null)
+            {
+                foreach (var additional in additionalConstructorObjects)
+                {
+                    var plannedArgument = new DefaultUnresolvedArgument();
+                    plannedArgument.ArgumentType = UnresolvedArgumentType.FactoryArgument;
+                    plannedArgument.FactoryArgumentValue = additional;
+                    createdNode.PlannedConstructorArguments.Add(plannedArgument);
+                }
+            }
+
+            foreach (var argument in createdNode.PlannedConstructorArguments)
+            {
+                switch (argument.ArgumentType)
+                {
+                    case UnresolvedArgumentType.Type:
+                        var child = Plan(argument.UnresolvedType, createdNode);
+                        if (child.ParentPlan == createdNode)
+                        {
+                            createdNode.ChildrenInternal.Add((INode) child);
+                        }
+                        ((DefaultUnresolvedArgument) argument).PlannedTarget = child;
+                        break;
+                }
+            }
+
+            if (createdNode.Parent == null)
+            {
+                ((DefaultHierarchy) _hierarchy).AddRootNode(createdNode);
+            }
+            else if (scopeNode != current)
+            {
+                ((DefaultNode)scopeNode).ChildrenInternal.Add(createdNode);
+            }
+
+            return createdNode;
+        }
+
+        private IMapping ResolveType(Type originalType, INode current = null)
+        {
+            // Try to resolve the type using bindings first.
+            if (_bindings.ContainsKey(originalType))
+            {
+                var bindings = _bindings[originalType];
+                var sortedBindings = bindings.OrderBy(x => x.OnlyUnderDescendantFilter != null ? 0 : 1);
+                foreach (var b in sortedBindings)
+                {
+                    if (b.OnlyUnderDescendantFilter != null)
+                    {
+                        var parents = b.OnlyUnderDescendantFilter.GetParents();
+                        if (!parents.Contains(current))
+                        {
+                            continue;
+                        }
+                    }
+
+                    return b;
+                }
+            }
+
+            // If the type is a concrete type, return it.
+            if (!originalType.IsAbstract && !originalType.IsInterface)
+            {
+                return new DefaultMapping
+                {
+                    Target = originalType
+                };
+            }
+
+            // We can't resolve this type.
+            throw new ActivationException("No matching bindings for type " + originalType.FullName, current);
+        }
+
+        private object FactoryResolve(Type typeToCreate, INode current, object[] parameters)
+        {
+            var plan = Plan(typeToCreate, current, parameters);
+            Validate(plan);
+            return Resolve(plan);
+        }
+
+        private Delegate CreateFuncFactory(Type factoryType, INode current = null)
+        {
+            var genericArguments = factoryType.GetGenericArguments();
+            var funcArgumentCount = genericArguments.Length - 1;
+
+            var targetType = genericArguments[funcArgumentCount];
+            var get = this.GetType().GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
+                .First(x => x.Name == "FactoryResolve" && !x.IsGenericMethod);
+            var args = new List<Expression>();
+            args.Add(Expression.Constant(targetType, typeof(Type)));
+            args.Add(Expression.Constant(current, typeof(INode)));
+            var @params = new List<ParameterExpression>();
+            for (var n = 0; n < funcArgumentCount; n++)
+            {
+                @params.Add(Expression.Parameter(genericArguments[n]));
+            }
+            args.Add(Expression.NewArrayInit(typeof (object), @params));
+            var call = Expression.Call(Expression.Constant(this), get, args);
+            var cast = Expression.Convert(call, targetType);
+            var lambda = Expression.Lambda(cast, @params);
+            return lambda.Compile();
+        }
+
+        /*
+
+
+        List<IMapping> matchingBindings;
             if (!_bindings.ContainsKey(t))
             {
                 if (!t.IsAbstract && !t.IsInterface)
                 {
                     matchingBindings = new List<IMapping>
                     {
-                        new DefaultMapping(t, null, null, false)
+                        new DefaultMapping
+                        {
+                            Target = t
+                        }
                     };
                 }
                 else
                 {
-                    throw new ActivationException("No matching bindings for type " + t.FullName, current);
                 }
             }
             else
@@ -82,7 +301,7 @@ namespace Protoinject
                     scopeNode = b.LifetimeScope.GetContainingNode();
                 }
 
-                if (scopeNode != null && b.Reuse)
+                if (scopeNode != null && b.UniquePerScope)
                 {
                     var existing = scopeNode.Children.FirstOrDefault(x => x.Type.IsAssignableFrom(target));
                     if (existing != null)
@@ -107,9 +326,9 @@ namespace Protoinject
                 for (var i = 0; i < paramCount; i++)
                 {
                     var parameter = parameters[i];
-                    if (parameter.ParameterType == typeof (ISetNodeName))
+                    if (parameter.ParameterType == typeof (ICurrentNode))
                     {
-                        arguments.Add(new DefaultSetNodeName(self));
+                        arguments.Add(new DefaultCurrentNode(self));
                     }
                     else if (parameter.ParameterType.IsGenericType)
                     {
@@ -131,21 +350,6 @@ namespace Protoinject
                         }
                         else if (parameter.ParameterType.GetGenericTypeDefinition() == typeof (Func<,>))
                         {
-                            var targetType = parameter.ParameterType.GetGenericArguments()[1];
-                            var get = this.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                                .First(x => x.Name == "Get" && !x.IsGenericMethod);
-                            var param0 = Expression.Parameter(parameter.ParameterType.GetGenericArguments()[0]);
-                            var args = new List<Expression>();
-                            args.Add(Expression.Constant(targetType));
-                            args.Add(Expression.Constant(self));
-                            args.Add(Expression.NewArrayInit(typeof (object), param0));
-                            var call = Expression.Call(Expression.Constant(this), get, args);
-                            var cast = Expression.Convert(call, targetType);
-                            var ret = Expression.Return(Expression.Label(), call);
-                            var lambda = Expression.Lambda(cast, param0);
-                            arguments.Add(lambda.Compile());
-
-                            //arguments.Add((Func<object, object>)(x => Get(targetType, self, new[] { x })));
                         }
                         else
                         {
@@ -180,6 +384,8 @@ namespace Protoinject
 
             throw new ActivationException("No bindings matched the request", current);
         }
+        */
+
 
         public IScope CreateScopeFromNode(INode node)
         {
@@ -188,117 +394,20 @@ namespace Protoinject
 
         public INode CreateEmptyNode(string name, INode parent = null)
         {
-            var node = new DefaultNode(parent, name);
+            var node = new DefaultNode
+            {
+                Parent = parent,
+                Name = DefaultNode.NormalizeName(name)
+            };
             if (parent == null)
             {
-                _rootHierarchies.Add(node);
+                _hierarchy.AddRootNode(node);
             }
             else
             {
-                ((DefaultNode)parent).ChildrenInternal.Add(node);
+                ((DefaultNode) parent).ChildrenInternal.Add(node);
             }
             return node;
-        }
-
-        private class FixedScope : IScope
-        {
-            private readonly INode _node;
-
-            public FixedScope(INode node)
-            {
-                _node = node;
-            }
-
-            public INode GetContainingNode()
-            {
-                return _node;
-            }
-        }
-
-        private class DefaultSetNodeName : ISetNodeName
-        {
-            private readonly INode _target;
-
-            public DefaultSetNodeName(INode target)
-            {
-                _target = target;
-            }
-
-            public void SetName(string name)
-            {
-                _target.Name = name;
-            }
-        }
-
-        private class DefaultNode : INode
-        {
-            public DefaultNode(INode parent, string name)
-            {
-                Parent = parent;
-                Name = (name ?? string.Empty).Replace("/", "");
-                ChildrenInternal = new List<INode>();
-            }
-
-            public void SetTypeAndValue(Type type, object value)
-            {
-                Type = type;
-                Value = value;
-            }
-
-            internal List<INode> ChildrenInternal { get; }
-
-            public INode Parent { get; }
-            public string Name { get; set; }
-
-            public IReadOnlyCollection<INode> Children => ChildrenInternal.AsReadOnly();
-
-            public string FullName
-            {
-                get
-                {
-                    return
-                        GetParents()
-                            .Concat(new[] {this})
-                            .Select(x => string.IsNullOrWhiteSpace(x.Name) ? ("(" + x.Type.FullName + ")") : x.Name)
-                            .Aggregate((a, b) => a + "/" + b);
-                }
-            }
-
-            public object Value { get; private set; }
-            public Type Type { get; private set; }
-
-            public T GetValue<T>()
-            {
-                return (T) Value;
-            }
-
-            public IReadOnlyCollection<INode> GetParents()
-            {
-                var parents = new List<INode>();
-                var current = Parent;
-                while (current != null)
-                {
-                    parents.Insert(0, current);
-                    current = current.Parent;
-                }
-                return parents.AsReadOnly();
-            } 
-        }
-
-        private class DefaultMapping : IMapping
-        {
-            public DefaultMapping(Type target, INode descendantFilter, IScope lifetimeScope, bool reuse)
-            {
-                Target = target;
-                OnlyUnderDescendantFilter = descendantFilter;
-                LifetimeScope = lifetimeScope;
-                Reuse = reuse;
-            }
-
-            public Type Target { get; }
-            public INode OnlyUnderDescendantFilter { get; }
-            public IScope LifetimeScope { get; }
-            public bool Reuse { get; }
         }
     }
 }

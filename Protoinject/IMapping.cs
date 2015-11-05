@@ -10,6 +10,6 @@ namespace Protoinject
 
         IScope LifetimeScope { get; }
 
-        bool Reuse { get; }
+        bool UniquePerScope { get; }
     }
 }

@@ -5,10 +5,23 @@
   </References>
   <Files>
     <Compile Include="ActivationException.cs" />
+    <Compile Include="DefaultBindToInScopeWithDescendantFilterOrUnique.cs" />
+    <Compile Include="DefaultCurrentNode.cs" />
+    <Compile Include="DefaultHierarchy.cs" />
+    <Compile Include="DefaultMapping.cs" />
+    <Compile Include="DefaultNode.cs" />
+    <Compile Include="DefaultUnresolvedArgument.cs" />
+    <Compile Include="FixedScope.cs" />
+    <Compile Include="IBindingInterfaces.cs" />
+    <Compile Include="ICurrentNode.cs" />
+    <Compile Include="IHierarchy.cs" />
+    <Compile Include="IKernel.cs" />
     <Compile Include="IMapping.cs" />
     <Compile Include="INode.cs" />
+    <Compile Include="IPlan.cs" />
     <Compile Include="IScope.cs" />
-    <Compile Include="ISetNodeName.cs" />
+    <Compile Include="IUnresolvedArgument.cs" />
     <Compile Include="StandardKernel.cs" />
+    <Compile Include="UnresolvedArgumentType.cs" />
   </Files>
 </Project>
