@@ -2,7 +2,12 @@
 
 namespace Protoinject
 {
-    internal class DefaultHierarchy : IHierarchy
+    internal interface IWritableHierarchy : IHierarchy
+    {
+        new List<INode> RootNodes { get; }
+    }
+
+    internal class DefaultHierarchy : IWritableHierarchy
     {
         private List<INode> _rootNodes;
 
@@ -11,11 +16,8 @@ namespace Protoinject
             _rootNodes = new List<INode>();
         }
 
-        public IReadOnlyCollection<INode> RootNodes => _rootNodes.AsReadOnly();
+        IReadOnlyCollection<INode> IHierarchy.RootNodes => _rootNodes.AsReadOnly();
 
-        public void AddRootNode(INode node)
-        {
-            _rootNodes.Add(node);
-        }
+        public List<INode> RootNodes => _rootNodes;
     }
 }

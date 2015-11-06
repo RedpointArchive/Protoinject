@@ -15,6 +15,8 @@ namespace Protoinject
         public DefaultNode()
         {
             ChildrenInternal = new List<INode>();
+            PlannedCreatedNodes = new List<IPlan>();
+            DependentOnPlans = new List<IPlan>();
         }
 
         internal List<INode> ChildrenInternal { get; }
@@ -23,6 +25,8 @@ namespace Protoinject
         public string Name { get; set; }
 
         public IReadOnlyCollection<INode> Children => ChildrenInternal.AsReadOnly();
+
+        public List<IPlan> PlannedCreatedNodes { get; }
 
         public string FullName
         {
@@ -35,6 +39,10 @@ namespace Protoinject
                         .Aggregate((a, b) => a + "/" + b);
             }
         }
+
+        public IPlan PlanRoot { get; set; }
+        public List<IPlan> DependentOnPlans { get; }
+        public bool Discarded { get; set; }
 
         public object UntypedValue { get; set; }
 
@@ -53,6 +61,7 @@ namespace Protoinject
         }
 
         public bool Planned { get; set; }
+        public string PlanName { get; set; }
 
         public void SetTypeAndValue(Type type, object value)
         {
@@ -60,7 +69,11 @@ namespace Protoinject
             UntypedValue = value;
         }
 
-        public IPlan ParentPlan => Parent;
+        public IPlan ParentPlan
+        {
+            get { return Parent; }
+        }
+
         public IReadOnlyCollection<IPlan> ChildrenPlan => Children;
         public ConstructorInfo PlannedConstructor { get; set; }
 

@@ -10,6 +10,8 @@ namespace Protoinject.Example
             Func<string, Player> playerFactory,
             ICurrentNode currentNode)
         {
+            currentNode.SetName("AmazingWorld");
+
             playerFactory("Player1");
             playerFactory("Player2");
         }

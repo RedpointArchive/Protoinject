@@ -11,7 +11,7 @@ namespace Protoinject
     {
         private Dictionary<Type, List<IMapping>> _bindings;
 
-        private DefaultHierarchy _hierarchy;
+        private IWritableHierarchy _hierarchy;
 
         public StandardKernel()
         {
@@ -39,14 +39,14 @@ namespace Protoinject
 
         public IHierarchy Hierarchy => _hierarchy;
 
-        public IPlan<T> Plan<T>(INode current = null)
+        public IPlan<T> Plan<T>(INode current = null, string planName = null)
         {
-            return (IPlan<T>) Plan(typeof (T), current);
+            return (IPlan<T>) Plan(typeof (T), current, planName);
         }
 
-        public IPlan Plan(Type t, INode current = null, object[] additionalConstructorObjects = null)
+        public IPlan Plan(Type t, INode current = null, string planName = null, object[] additionalConstructorObjects = null)
         {
-            return CreatePlan(t, current, additionalConstructorObjects);
+            return CreatePlan(t, current, planName, null, additionalConstructorObjects);
         }
 
         public void Validate<T>(IPlan<T> plan)
@@ -68,6 +68,41 @@ namespace Protoinject
             return ResolveToNode(plan).UntypedValue;
         }
 
+        public void Discard<T>(IPlan<T> plan)
+        {
+            Discard((IPlan)plan);
+        }
+
+        public void Discard(IPlan plan)
+        {
+            var planAsNode = (DefaultNode) plan;
+            planAsNode.Discarded = true;
+            foreach (var plan1 in planAsNode.PlannedCreatedNodes)
+            {
+                var toCreate = (DefaultNode) plan1;
+                var parent = toCreate.ParentPlan;
+                if (parent != null)
+                {
+                    ((DefaultNode) parent)?.ChildrenInternal.Remove((INode) toCreate);
+                }
+                else
+                {
+                    _hierarchy.RootNodes.Remove(toCreate);
+                }
+                toCreate.Parent = null;
+                toCreate.Discarded = true;
+            }
+            var nodeParent = planAsNode.ParentPlan;
+            if (nodeParent != null)
+            {
+                ((DefaultNode)nodeParent)?.ChildrenInternal.Remove(planAsNode);
+            }
+            else
+            {
+                _hierarchy.RootNodes.Remove(planAsNode);
+            }
+        }
+
         public INode<T> ResolveToNode<T>(IPlan<T> plan)
         {
             return (INode<T>) ResolveToNode((IPlan) plan);
@@ -75,10 +110,73 @@ namespace Protoinject
 
         public INode ResolveToNode(IPlan plan)
         {
-            return null;
+            if (!plan.Planned)
+            {
+                return (INode) plan;
+            }
+
+            foreach (var dependant in plan.DependentOnPlans)
+            {
+                if (dependant.Discarded)
+                {
+                    throw new ActivationException("This plan was dependant on plan '" + dependant.FullName + "' / '" +
+                                                  dependant.PlanName +
+                                                  "', but that plan has since been discarded.  Re-create this plan to resolve it.",
+                        plan);
+                }
+                else if (dependant.Planned)
+                {
+                    throw new ActivationException("This plan is dependant on plan '" + dependant.FullName + "' / '" +
+                                                  dependant.PlanName + "', but that plan is not resolved yet.", plan);
+                }
+            }
+
+            foreach (var node in plan.PlannedCreatedNodes)
+            {
+                var toCreate = (DefaultNode) node;
+                if (toCreate.Planned && toCreate.UntypedValue != null)
+                {
+                    // This is a factory.
+                    toCreate.Planned = false;
+                }
+                else if (toCreate.Planned)
+                {
+                    var parameters = new List<object>();
+                    foreach (var argument in toCreate.PlannedConstructorArguments)
+                    {
+                        parameters.Add(ResolveArgument(toCreate, argument));
+                    }
+                    toCreate.UntypedValue = toCreate.PlannedConstructor.Invoke(parameters.ToArray());
+                    toCreate.Planned = false;
+                }
+            }
+
+            return (INode) plan;
         }
 
-        private IPlan CreatePlan(Type requestedType, INode current = null, object[] additionalConstructorObjects = null)
+        private object ResolveArgument(DefaultNode toCreate, IUnresolvedArgument argument)
+        {
+            switch (argument.ArgumentType)
+            {
+                case UnresolvedArgumentType.Type:
+                    if (argument.PlannedTarget.Planned)
+                    {
+                        throw new ActivationException(
+                            "Expected " + argument.PlannedTarget.FullName + " to be resolved by now.", toCreate);
+                    }
+                    return ((DefaultNode) argument.PlannedTarget).UntypedValue;
+                case UnresolvedArgumentType.Factory:
+                    return argument.FactoryDelegate;
+                case UnresolvedArgumentType.FactoryArgument:
+                    return argument.FactoryArgumentValue;
+                case UnresolvedArgumentType.CurrentNode:
+                    return argument.CurrentNode;
+            }
+
+            throw new ActivationException("Unexpected argument type", toCreate);
+        }
+
+        private IPlan CreatePlan(Type requestedType, INode current = null, string planName = null, INode planRoot = null, object[] additionalConstructorObjects = null)
         {
             var resolvedMapping = ResolveType(requestedType, current);
 
@@ -93,6 +191,13 @@ namespace Protoinject
                 var existing = scopeNode.Children.FirstOrDefault(x => x.Type.IsAssignableFrom(resolvedMapping.Target));
                 if (existing != null)
                 {
+                    if (existing.Planned)
+                    {
+                        // Flag that the plan root is now dependant on the other
+                        // plan being resolved.
+                        planRoot?.DependentOnPlans.Add(existing.PlanRoot);
+                    }
+
                     return existing;
                 }
             }
@@ -103,92 +208,107 @@ namespace Protoinject
             createdNode.Parent = scopeNode;
             createdNode.Planned = true;
             createdNode.Type = resolvedMapping.Target;
+            createdNode.PlanName = planName;
+            createdNode.PlanRoot = planRoot;
 
-            // If the type is System.Func or similar, create it as a factory.
-            if (resolvedMapping.Target.FullName.StartsWith("System.Func`"))
+            // If there is no plan root, then we are the plan root.
+            if (planRoot == null)
             {
-                createdNode.PlannedConstructor = null;
-                createdNode.UntypedValue = CreateFuncFactory(createdNode.Type, current);
-                return createdNode;
+                planRoot = createdNode;
             }
 
-            createdNode.PlannedConstructor =
-                createdNode.Type.GetConstructors(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault();
-            if (createdNode.PlannedConstructor == null)
+            try
             {
-                // This node won't be valid because it's planned, has no value and
-                // has no constructor.
-                return createdNode;
-            }
-
-            createdNode.PlannedConstructorArguments = new List<IUnresolvedArgument>();
-
-            var parameters = createdNode.PlannedConstructor.GetParameters();
-            var paramCount = parameters.Length - (additionalConstructorObjects?.Length ?? 0);
-            for (var i = 0; i < paramCount; i++)
-            {
-                var parameter = parameters[i];
-
-                var plannedArgument = new DefaultUnresolvedArgument();
-                plannedArgument.ParameterName = parameter.Name;
-
-                if (parameter.ParameterType == typeof (ICurrentNode))
+                // If the type is System.Func or similar, create it as a factory.
+                if (resolvedMapping.Target.FullName.StartsWith("System.Func`"))
                 {
-                    plannedArgument.ArgumentType = UnresolvedArgumentType.CurrentNode;
-                    plannedArgument.CurrentNode = new DefaultCurrentNode(createdNode);
-                }
-                else if (parameter.ParameterType.FullName.StartsWith("System.Func`"))
-                {
-                    plannedArgument.ArgumentType = UnresolvedArgumentType.Factory;
-                    plannedArgument.UnresolvedType = parameter.ParameterType;
-                    plannedArgument.FactoryDelegate = CreateFuncFactory(plannedArgument.UnresolvedType, current);
-                    plannedArgument.FactoryType = plannedArgument.FactoryDelegate.Method.ReturnType;
-                }
-                else
-                {
-                    plannedArgument.ArgumentType = UnresolvedArgumentType.Type;
-                    plannedArgument.UnresolvedType = parameters[i].ParameterType;
+                    createdNode.PlannedConstructor = null;
+                    createdNode.UntypedValue = CreateFuncFactory(createdNode.Type, current);
+                    return createdNode;
                 }
 
-                createdNode.PlannedConstructorArguments.Add(plannedArgument);
-            }
-
-            if (additionalConstructorObjects != null)
-            {
-                foreach (var additional in additionalConstructorObjects)
+                createdNode.PlannedConstructor =
+                    createdNode.Type.GetConstructors(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault();
+                if (createdNode.PlannedConstructor == null)
                 {
+                    // This node won't be valid because it's planned, has no value and
+                    // has no constructor.
+                    return createdNode;
+                }
+
+                createdNode.PlannedConstructorArguments = new List<IUnresolvedArgument>();
+
+                var parameters = createdNode.PlannedConstructor.GetParameters();
+                var paramCount = parameters.Length - (additionalConstructorObjects?.Length ?? 0);
+                for (var i = 0; i < paramCount; i++)
+                {
+                    var parameter = parameters[i];
+
                     var plannedArgument = new DefaultUnresolvedArgument();
-                    plannedArgument.ArgumentType = UnresolvedArgumentType.FactoryArgument;
-                    plannedArgument.FactoryArgumentValue = additional;
+                    plannedArgument.ParameterName = parameter.Name;
+
+                    if (parameter.ParameterType == typeof (ICurrentNode))
+                    {
+                        plannedArgument.ArgumentType = UnresolvedArgumentType.CurrentNode;
+                        plannedArgument.CurrentNode = new DefaultCurrentNode(createdNode);
+                    }
+                    else if (parameter.ParameterType.FullName.StartsWith("System.Func`"))
+                    {
+                        plannedArgument.ArgumentType = UnresolvedArgumentType.Factory;
+                        plannedArgument.UnresolvedType = parameter.ParameterType;
+                        plannedArgument.FactoryDelegate = CreateFuncFactory(plannedArgument.UnresolvedType, createdNode);
+                        plannedArgument.FactoryType = plannedArgument.FactoryDelegate.Method.ReturnType;
+                    }
+                    else
+                    {
+                        plannedArgument.ArgumentType = UnresolvedArgumentType.Type;
+                        plannedArgument.UnresolvedType = parameters[i].ParameterType;
+                    }
+
                     createdNode.PlannedConstructorArguments.Add(plannedArgument);
                 }
-            }
 
-            foreach (var argument in createdNode.PlannedConstructorArguments)
-            {
-                switch (argument.ArgumentType)
+                if (additionalConstructorObjects != null)
                 {
-                    case UnresolvedArgumentType.Type:
-                        var child = Plan(argument.UnresolvedType, createdNode);
-                        if (child.ParentPlan == createdNode)
-                        {
-                            createdNode.ChildrenInternal.Add((INode) child);
-                        }
-                        ((DefaultUnresolvedArgument) argument).PlannedTarget = child;
-                        break;
+                    foreach (var additional in additionalConstructorObjects)
+                    {
+                        var plannedArgument = new DefaultUnresolvedArgument();
+                        plannedArgument.ArgumentType = UnresolvedArgumentType.FactoryArgument;
+                        plannedArgument.FactoryArgumentValue = additional;
+                        createdNode.PlannedConstructorArguments.Add(plannedArgument);
+                    }
                 }
-            }
 
-            if (createdNode.Parent == null)
-            {
-                ((DefaultHierarchy) _hierarchy).AddRootNode(createdNode);
-            }
-            else if (scopeNode != current)
-            {
-                ((DefaultNode)scopeNode).ChildrenInternal.Add(createdNode);
-            }
+                foreach (var argument in createdNode.PlannedConstructorArguments)
+                {
+                    switch (argument.ArgumentType)
+                    {
+                        case UnresolvedArgumentType.Type:
+                            var child = CreatePlan(argument.UnresolvedType, createdNode, planName, planRoot);
+                            if (child.ParentPlan == createdNode)
+                            {
+                                createdNode.ChildrenInternal.Add((INode) child);
+                            }
+                            ((DefaultUnresolvedArgument) argument).PlannedTarget = child;
+                            break;
+                    }
+                }
 
-            return createdNode;
+                if (createdNode.Parent == null)
+                {
+                    _hierarchy.RootNodes.Add(createdNode);
+                }
+                else //if (scopeNode != current)
+                {
+                    ((DefaultNode) scopeNode).ChildrenInternal.Add(createdNode);
+                }
+
+                return createdNode;
+            }
+            finally
+            {
+                planRoot.PlannedCreatedNodes.Add(createdNode);
+            }
         }
 
         private IMapping ResolveType(Type originalType, INode current = null)
@@ -228,7 +348,7 @@ namespace Protoinject
 
         private object FactoryResolve(Type typeToCreate, INode current, object[] parameters)
         {
-            var plan = Plan(typeToCreate, current, parameters);
+            var plan = Plan(typeToCreate, current, "<via factory>", parameters);
             Validate(plan);
             return Resolve(plan);
         }
@@ -401,7 +521,7 @@ namespace Protoinject
             };
             if (parent == null)
             {
-                _hierarchy.AddRootNode(node);
+                _hierarchy.RootNodes.Add(node);
             }
             else
             {

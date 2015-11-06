@@ -16,8 +16,6 @@ namespace Protoinject
         Type Type { get; }
 
         IReadOnlyCollection<INode> GetParents();
-
-        bool Planned { get; }
     }
 
     public interface INode<out T> : INode, IPlan<T>

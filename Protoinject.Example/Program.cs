@@ -30,10 +30,38 @@ namespace Protoinject.Example
             kernel.Bind<IWorld>().To<DefaultWorld>();
             kernel.Bind<IPlayer>().To<Player>();
 
-            var worldPlan = kernel.Plan<IWorld>();
-            kernel.Validate(worldPlan);
+            var worldPlan = kernel.Plan<IWorld>(null, "world1");
+            var worldPlan2 = kernel.Plan<IWorld>(null, "world2");
+            //kernel.Validate(worldPlan);
             //var world = kernel.Resolve(worldPlan);
 
+            Console.WriteLine("==== AFTER PLANNING TWO WORLDS ====");
+            foreach (var root in kernel.Hierarchy.RootNodes)
+            {
+                Console.Write(root.GetDebugRepresentation());
+            }
+
+            /*
+            kernel.Discard(worldPlan);
+            
+            Console.WriteLine("==== AFTER DISCARDING WORLD 1 ====");
+            foreach (var root in kernel.Hierarchy.RootNodes)
+            {
+                Console.Write(root.GetDebugRepresentation());
+            }
+            */
+
+            kernel.ResolveToNode(worldPlan);
+
+            Console.WriteLine("==== AFTER RESOLVING WORLD 1 ====");
+            foreach (var root in kernel.Hierarchy.RootNodes)
+            {
+                Console.Write(root.GetDebugRepresentation());
+            }
+
+            kernel.ResolveToNode(worldPlan2);
+
+            Console.WriteLine("==== AFTER RESOLVING WORLD 2 ====");
             foreach (var root in kernel.Hierarchy.RootNodes)
             {
                 Console.Write(root.GetDebugRepresentation());
@@ -61,7 +89,14 @@ namespace Protoinject.Example
             }
             if (current.Planned)
             {
-                me += " **PLANNED**";
+                if (!string.IsNullOrWhiteSpace(current.PlanName))
+                {
+                    me += " **PLANNED (as '" + current.PlanName + "')**";
+                }
+                else
+                {
+                    me += " **PLANNED**";
+                }
             }
             me += Environment.NewLine;
             foreach (var c in current.Children)
