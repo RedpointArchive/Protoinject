@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -12,6 +13,7 @@ namespace Protoinject
         private Dictionary<Type, List<IMapping>> _bindings;
 
         private IWritableHierarchy _hierarchy;
+        private IScope _singletonScope;
 
         public StandardKernel()
         {
@@ -19,7 +21,7 @@ namespace Protoinject
             _hierarchy = new DefaultHierarchy();
         }
 
-        public IBindToInScopeWithDescendantFilterOrUnique<TInterface> Bind<TInterface>()
+        public IBindToInScopeWithDescendantFilterOrUniqueOrNamed<TInterface> Bind<TInterface>()
         {
             List<IMapping> list;
             if (!_bindings.ContainsKey(typeof (TInterface)))
@@ -34,19 +36,47 @@ namespace Protoinject
             var mapping = new DefaultMapping();
             mapping.Target = typeof (TInterface);
             list.Add(mapping);
-            return new DefaultBindToInScopeWithDescendantFilterOrUnique<TInterface>(mapping);
+            return new DefaultBindToInScopeWithDescendantFilterOrUnique<TInterface>(this, mapping);
+        }
+
+        public IBindToInScopeWithDescendantFilterOrUniqueOrNamed Bind(Type @interface)
+        {
+            List<IMapping> list;
+            if (!_bindings.ContainsKey(@interface))
+            {
+                list = new List<IMapping>();
+                _bindings[@interface] = list;
+            }
+            else
+            {
+                list = _bindings[@interface];
+            }
+            var mapping = new DefaultMapping();
+            mapping.Target = @interface;
+            list.Add(mapping);
+            return new DefaultBindToInScopeWithDescendantFilterOrUniqueOrNamed(this, mapping);
+        }
+
+        public void Unbind<T>()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Unbind(Type @interface)
+        {
+            throw new NotImplementedException();
         }
 
         public IHierarchy Hierarchy => _hierarchy;
 
-        public IPlan<T> Plan<T>(INode current = null, string planName = null)
+        public IPlan<T> Plan<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
         {
-            return (IPlan<T>) Plan(typeof (T), current, planName);
+            return (IPlan<T>) Plan(typeof (T), current, bindingName, planName, arguments);
         }
 
-        public IPlan Plan(Type t, INode current = null, string planName = null, object[] additionalConstructorObjects = null)
+        public IPlan Plan(Type t, INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
         {
-            return CreatePlan(t, current, planName, null, additionalConstructorObjects);
+            return CreatePlan(t, current, bindingName, planName, null, arguments);
         }
 
         public void Validate<T>(IPlan<T> plan)
@@ -56,6 +86,20 @@ namespace Protoinject
 
         public void Validate(IPlan plan)
         {
+            if (!plan.Valid)
+            {
+                throw new ActivationException("The planned node is not valid", plan);
+            }
+
+            foreach (var toCreate in plan.PlannedCreatedNodes)
+            {
+                if (!toCreate.Valid)
+                {
+                    throw new ActivationException("The planned node is not valid", plan);
+                }
+            }
+
+            // TODO: Validate more configuration
         }
 
         public T Resolve<T>(IPlan<T> plan)
@@ -154,6 +198,16 @@ namespace Protoinject
             return (INode) plan;
         }
 
+        public IEnumerable<T> GetAll<T>()
+        {
+            throw new NotImplementedException();
+        }
+
+        public IEnumerable GetAll(Type type)
+        {
+            throw new NotImplementedException();
+        }
+
         private object ResolveArgument(DefaultNode toCreate, IUnresolvedArgument argument)
         {
             switch (argument.ArgumentType)
@@ -171,14 +225,16 @@ namespace Protoinject
                     return argument.FactoryArgumentValue;
                 case UnresolvedArgumentType.CurrentNode:
                     return argument.CurrentNode;
+                case UnresolvedArgumentType.KnownValue:
+                    return argument.KnownValue;
             }
 
             throw new ActivationException("Unexpected argument type", toCreate);
         }
 
-        private IPlan CreatePlan(Type requestedType, INode current = null, string planName = null, INode planRoot = null, object[] additionalConstructorObjects = null)
+        private IPlan CreatePlan(Type requestedType, INode current, string bindingName, string planName, INode planRoot, IConstructorArgument[] arguments)
         {
-            var resolvedMapping = ResolveType(requestedType, current);
+            var resolvedMapping = ResolveType(requestedType, bindingName, current);
 
             var scopeNode = current;
             if (resolvedMapping.LifetimeScope != null)
@@ -202,12 +258,20 @@ namespace Protoinject
                 }
             }
 
-            var nodeToCreate = typeof (DefaultNode<>).MakeGenericType(resolvedMapping.Target);
+            Type nodeToCreate;
+            if (resolvedMapping.Target != null)
+            {
+                nodeToCreate = typeof(DefaultNode<>).MakeGenericType(resolvedMapping.Target);
+            }
+            else
+            {
+                nodeToCreate = typeof(DefaultNode<>).MakeGenericType(requestedType);
+            }
             var createdNode = (DefaultNode) Activator.CreateInstance(nodeToCreate);
             createdNode.Name = string.Empty;
             createdNode.Parent = scopeNode;
             createdNode.Planned = true;
-            createdNode.Type = resolvedMapping.Target;
+            createdNode.Type = resolvedMapping.Target ?? requestedType;
             createdNode.PlanName = planName;
             createdNode.PlanRoot = planRoot;
 
@@ -219,11 +283,23 @@ namespace Protoinject
 
             try
             {
-                // If the type is System.Func or similar, create it as a factory.
-                if (resolvedMapping.Target.FullName.StartsWith("System.Func`"))
+                if (resolvedMapping.Target != null)
                 {
-                    createdNode.PlannedConstructor = null;
-                    createdNode.UntypedValue = CreateFuncFactory(createdNode.Type, current);
+                    // If the type is System.Func or similar, create it as a factory.
+                    if (resolvedMapping.Target.FullName.StartsWith("System.Func`"))
+                    {
+                        createdNode.PlannedConstructor = null;
+                        createdNode.UntypedValue = CreateFuncFactory(createdNode.Type, current);
+                        return createdNode;
+                    }
+                }
+
+                // TODO: Handle ToMethod and ToFactory mappings.
+
+                if (createdNode.Type == null)
+                {
+                    // This node won't be valid because it's planned, has no value and
+                    // has no constructor.
                     return createdNode;
                 }
 
@@ -239,7 +315,7 @@ namespace Protoinject
                 createdNode.PlannedConstructorArguments = new List<IUnresolvedArgument>();
 
                 var parameters = createdNode.PlannedConstructor.GetParameters();
-                var paramCount = parameters.Length - (additionalConstructorObjects?.Length ?? 0);
+                var paramCount = parameters.Length - (arguments?.Length ?? 0);
                 for (var i = 0; i < paramCount; i++)
                 {
                     var parameter = parameters[i];
@@ -251,6 +327,11 @@ namespace Protoinject
                     {
                         plannedArgument.ArgumentType = UnresolvedArgumentType.CurrentNode;
                         plannedArgument.CurrentNode = new DefaultCurrentNode(createdNode);
+                    }
+                    else if (parameter.ParameterType == typeof(IKernel))
+                    {
+                        plannedArgument.ArgumentType = UnresolvedArgumentType.KnownValue;
+                        plannedArgument.KnownValue = this;
                     }
                     else if (parameter.ParameterType.FullName.StartsWith("System.Func`"))
                     {
@@ -268,9 +349,9 @@ namespace Protoinject
                     createdNode.PlannedConstructorArguments.Add(plannedArgument);
                 }
 
-                if (additionalConstructorObjects != null)
+                if (arguments != null)
                 {
-                    foreach (var additional in additionalConstructorObjects)
+                    foreach (var additional in arguments)
                     {
                         var plannedArgument = new DefaultUnresolvedArgument();
                         plannedArgument.ArgumentType = UnresolvedArgumentType.FactoryArgument;
@@ -284,7 +365,13 @@ namespace Protoinject
                     switch (argument.ArgumentType)
                     {
                         case UnresolvedArgumentType.Type:
-                            var child = CreatePlan(argument.UnresolvedType, createdNode, planName, planRoot);
+                            var child = CreatePlan(
+                                argument.UnresolvedType,
+                                createdNode, 
+                                null,
+                                planName, 
+                                planRoot,
+                                null);
                             if (child.ParentPlan == createdNode)
                             {
                                 createdNode.ChildrenInternal.Add((INode) child);
@@ -311,13 +398,14 @@ namespace Protoinject
             }
         }
 
-        private IMapping ResolveType(Type originalType, INode current = null)
+        private IMapping ResolveType(Type originalType, string name, INode current)
         {
             // Try to resolve the type using bindings first.
             if (_bindings.ContainsKey(originalType))
             {
                 var bindings = _bindings[originalType];
-                var sortedBindings = bindings.OrderBy(x => x.OnlyUnderDescendantFilter != null ? 0 : 1);
+                var sortedBindings = bindings.Where(x => x.Named == name)
+                    .OrderBy(x => x.OnlyUnderDescendantFilter != null ? 0 : 1);
                 foreach (var b in sortedBindings)
                 {
                     if (b.OnlyUnderDescendantFilter != null)
@@ -343,12 +431,17 @@ namespace Protoinject
             }
 
             // We can't resolve this type.
-            throw new ActivationException("No matching bindings for type " + originalType.FullName, current);
+            return new InvalidMapping();
         }
 
-        private object FactoryResolve(Type typeToCreate, INode current, object[] parameters)
+        private object FactoryResolve(Type typeToCreate, INode current, IConstructorArgument[] parameters)
         {
-            var plan = Plan(typeToCreate, current, "<via factory>", parameters);
+            var plan = Plan(
+                typeToCreate,
+                current,
+                null,
+                "<via factory>", 
+                parameters.Select((x, i) => new RelativePositionalConstructorArgument(i, x)).OfType<IConstructorArgument>().ToArray());
             Validate(plan);
             return Resolve(plan);
         }
@@ -369,147 +462,72 @@ namespace Protoinject
             {
                 @params.Add(Expression.Parameter(genericArguments[n]));
             }
-            args.Add(Expression.NewArrayInit(typeof (object), @params));
+            args.Add(Expression.NewArrayInit(typeof (IConstructorArgument), @params));
             var call = Expression.Call(Expression.Constant(this), get, args);
             var cast = Expression.Convert(call, targetType);
             var lambda = Expression.Lambda(cast, @params);
             return lambda.Compile();
         }
 
-        /*
-
-
-        List<IMapping> matchingBindings;
-            if (!_bindings.ContainsKey(t))
-            {
-                if (!t.IsAbstract && !t.IsInterface)
-                {
-                    matchingBindings = new List<IMapping>
-                    {
-                        new DefaultMapping
-                        {
-                            Target = t
-                        }
-                    };
-                }
-                else
-                {
-                }
-            }
-            else
-            {
-                matchingBindings = _bindings[t];
-            }
-
-            var sortedBindings = matchingBindings.OrderBy(x => x.OnlyUnderDescendantFilter != null ? 0 : 1);
-            foreach (var b in sortedBindings)
-            {
-                if (b.OnlyUnderDescendantFilter != null)
-                {
-                    var parents = b.OnlyUnderDescendantFilter.GetParents();
-                    if (!parents.Contains(current))
-                    {
-                        continue;
-                    }
-                }
-
-                var target = b.Target;
-
-                var scopeNode = current;
-                if (b.LifetimeScope != null)
-                {
-                    scopeNode = b.LifetimeScope.GetContainingNode();
-                }
-
-                if (scopeNode != null && b.UniquePerScope)
-                {
-                    var existing = scopeNode.Children.FirstOrDefault(x => x.Type.IsAssignableFrom(target));
-                    if (existing != null)
-                    {
-                        return existing.Value;
-                    }
-                }
-
-                var constructor = target.GetConstructors(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault();
-                if (constructor == null)
-                {
-                    // TODO: exception / log
-                    continue;
-                }
-
-                var self = new DefaultNode(scopeNode, null);
-                self.SetTypeAndValue(target, null);
-
-                var arguments = new List<object>();
-                var parameters = constructor.GetParameters();
-                var paramCount = parameters.Length - (additionalConstructorObjects?.Length ?? 0);
-                for (var i = 0; i < paramCount; i++)
-                {
-                    var parameter = parameters[i];
-                    if (parameter.ParameterType == typeof (ICurrentNode))
-                    {
-                        arguments.Add(new DefaultCurrentNode(self));
-                    }
-                    else if (parameter.ParameterType.IsGenericType)
-                    {
-                        if (parameter.ParameterType.GetGenericTypeDefinition() == typeof (Func<>))
-                        {
-                            var targetType = parameter.ParameterType.GetGenericArguments()[0];
-                            var get = this.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                                .First(x => x.Name == "Get" && !x.IsGenericMethod);
-                            var args = new List<Expression>();
-                            args.Add(Expression.Constant(this));
-                            args.Add(Expression.Constant(targetType));
-                            args.Add(Expression.Constant(self));
-                            args.Add(Expression.NewArrayInit(typeof (object)));
-                            var call = Expression.Call(Expression.Constant(this), get, args);
-                            var ret = Expression.Return(Expression.Label(), call);
-                            var lambda = Expression.Lambda(call);
-                            arguments.Add(lambda.Compile());
-                            //arguments.Add((Func<object>) (() => Get(targetType, self)));
-                        }
-                        else if (parameter.ParameterType.GetGenericTypeDefinition() == typeof (Func<,>))
-                        {
-                        }
-                        else
-                        {
-                            arguments.Add(Get(parameter.ParameterType, self));
-                        }
-                    }
-                    else
-                    {
-                        arguments.Add(Get(parameter.ParameterType, self));
-                    }
-                }
-
-                if (additionalConstructorObjects != null)
-                {
-                    arguments.AddRange(additionalConstructorObjects);
-                }
-
-                var resolved = constructor.Invoke(arguments.ToArray());
-                self.SetTypeAndValue(target, resolved);
-
-                if (self.Parent == null)
-                {
-                    _rootHierarchies.Add(self);
-                }
-                else
-                {
-                    ((DefaultNode)self.Parent).ChildrenInternal.Add(self);
-                }
-
-                return resolved;
-            }
-
-            throw new ActivationException("No bindings matched the request", current);
-        }
-        */
-
-
         public IScope CreateScopeFromNode(INode node)
         {
             return new FixedScope(node);
+        }
+
+        public void Load<T>() where T : IProtoinjectModule
+        {
+            Activator.CreateInstance<T>().Load(this);
+        }
+
+        public void Load(IProtoinjectModule module)
+        {
+            module.Load(this);
+        }
+
+        public T Get<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        {
+            var plan = Plan<T>(current, bindingName, planName, arguments);
+            Validate(plan);
+            return Resolve(plan);
+        }
+
+        public object Get(Type type, INode current, string bindingName, string planName,
+            params IConstructorArgument[] arguments)
+        {
+            var plan = Plan(type, current, bindingName, planName, arguments);
+            Validate(plan);
+            return Resolve(plan);
+        }
+
+        public T TryGet<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        {
+            var plan = Plan<T>(current, bindingName, planName, arguments);
+            try
+            {
+                Validate(plan);
+                return Resolve(plan);
+            }
+            catch (Exception)
+            {
+                Discard(plan);
+                return (T)(object)null;
+            }
+        }
+
+        public object TryGet(Type type, INode current, string bindingName, string planName,
+            params IConstructorArgument[] arguments)
+        {
+            var plan = Plan(type, current, bindingName, planName, arguments);
+            try
+            {
+                Validate(plan);
+                return Resolve(plan);
+            }
+            catch (Exception)
+            {
+                Discard(plan);
+                return null;
+            }
         }
 
         public INode CreateEmptyNode(string name, INode parent = null)
@@ -528,6 +546,16 @@ namespace Protoinject
                 ((DefaultNode) parent).ChildrenInternal.Add(node);
             }
             return node;
+        }
+
+        public IScope GetSingletonScope()
+        {
+            if (_singletonScope == null)
+            {
+                _singletonScope = CreateScopeFromNode(CreateEmptyNode("Singletons"));
+            }
+
+            return _singletonScope;
         }
     }
 }

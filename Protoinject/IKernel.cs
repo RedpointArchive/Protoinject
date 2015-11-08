@@ -1,20 +1,28 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace Protoinject
 {
     public interface IKernel
     {
-        //object Get(Type t, INode current = null, object[] additionalConstructorObjects = null);
-        // T Get<T>(INode current = null);
-        //IReadOnlyCollection<INode> GetRootHierarchies();
         IHierarchy Hierarchy { get; }
-        IBindToInScopeWithDescendantFilterOrUnique<TInterface> Bind<TInterface>();
+        IBindToInScopeWithDescendantFilterOrUniqueOrNamed<TInterface> Bind<TInterface>();
+        IBindToInScopeWithDescendantFilterOrUniqueOrNamed Bind(Type @interface);
+        void Unbind<T>();
+        void Unbind(Type @interface);
         INode CreateEmptyNode(string name, INode parent = null);
         IScope CreateScopeFromNode(INode node);
 
+        void Load(IProtoinjectModule module);
+        
+        T Get<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
+        object Get(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
+        T TryGet<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
+        object TryGet(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
 
-        IPlan<T> Plan<T>(INode current = null, string planName = null);
-        IPlan Plan(Type t, INode current = null, string planName = null, object[] additionalConstructorObjects = null);
+        IPlan<T> Plan<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
+        IPlan Plan(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
         void Validate<T>(IPlan<T> plan);
         void Validate(IPlan plan);
         T Resolve<T>(IPlan<T> plan);
@@ -23,5 +31,8 @@ namespace Protoinject
         void Discard(IPlan plan);
         INode<T> ResolveToNode<T>(IPlan<T> plan);
         INode ResolveToNode(IPlan plan);
+
+        IEnumerable<T> GetAll<T>();
+        IEnumerable GetAll(Type type);
     }
 }

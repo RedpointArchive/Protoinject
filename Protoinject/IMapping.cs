@@ -6,10 +6,16 @@ namespace Protoinject
     {
         Type Target { get; }
 
+        Func<IContext, object> TargetMethod { get; }
+
         INode OnlyUnderDescendantFilter { get; }
 
         IScope LifetimeScope { get; }
 
         bool UniquePerScope { get; }
+
+        string Named { get; }
+
+        bool Valid { get; }
     }
 }

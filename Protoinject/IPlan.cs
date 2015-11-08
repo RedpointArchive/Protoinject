@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Net.Configuration;
 using System.Reflection;
 
 namespace Protoinject
@@ -26,6 +27,8 @@ namespace Protoinject
         List<IPlan> DependentOnPlans { get; } 
 
         bool Discarded { get; }
+
+        bool Valid { get; }
     }
 
     public interface IPlan<out T> : IPlan

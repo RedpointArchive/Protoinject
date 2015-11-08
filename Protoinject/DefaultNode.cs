@@ -44,6 +44,19 @@ namespace Protoinject
         public List<IPlan> DependentOnPlans { get; }
         public bool Discarded { get; set; }
 
+        public bool Valid
+        {
+            get
+            {
+                if (this.Planned)
+                {
+                    return UntypedValue != null || PlannedConstructor != null;
+                }
+
+                return !Discarded;
+            }
+        }
+
         public object UntypedValue { get; set; }
 
         public Type Type { get; set; }
@@ -82,6 +95,11 @@ namespace Protoinject
         public static string NormalizeName(string name)
         {
             return (name ?? string.Empty).Replace("/", "");
+        }
+
+        public override string ToString()
+        {
+            return this.GetDebugRepresentation();
         }
     }
 }

@@ -4,23 +4,41 @@
     <Reference Include="System" />
   </References>
   <Files>
+    <Compile Include="AbsolutePositionalConstructorArgument.cs" />
     <Compile Include="ActivationException.cs" />
-    <Compile Include="DefaultBindToInScopeWithDescendantFilterOrUnique.cs" />
+    <Compile Include="DefaultBindToInScopeWithDescendantFilterOrUniqueOrNamed.cs" />
+    <Compile Include="DefaultContext.cs" />
     <Compile Include="DefaultCurrentNode.cs" />
     <Compile Include="DefaultHierarchy.cs" />
     <Compile Include="DefaultMapping.cs" />
     <Compile Include="DefaultNode.cs" />
     <Compile Include="DefaultUnresolvedArgument.cs" />
+    <Compile Include="FactoryProxy.cs" />
     <Compile Include="FixedScope.cs" />
-    <Compile Include="IBindingInterfaces.cs" />
+    <Compile Include="IBindInScope.cs" />
+    <Compile Include="IBindInScopeOrUnique.cs" />
+    <Compile Include="IBindInScopeWithDescendantFilterOrUnique.cs" />
+    <Compile Include="IBindInScopeWithDescendantFilterOrUniqueOrNamed.cs" />
+    <Compile Include="IBindTo.cs" />
+    <Compile Include="IBindToInScopeWithDescendantFilterOrUniqueOrNamed.cs" />
+    <Compile Include="IBindUnique.cs" />
+    <Compile Include="IBindWithDescendantFilter.cs" />
+    <Compile Include="IConstructorArgument.cs" />
+    <Compile Include="IContext.cs" />
     <Compile Include="ICurrentNode.cs" />
     <Compile Include="IHierarchy.cs" />
     <Compile Include="IKernel.cs" />
     <Compile Include="IMapping.cs" />
     <Compile Include="INode.cs" />
+    <Compile Include="InvalidMapping.cs" />
     <Compile Include="IPlan.cs" />
     <Compile Include="IScope.cs" />
     <Compile Include="IUnresolvedArgument.cs" />
+    <Compile Include="KernelExtensions.cs" />
+    <Compile Include="NamedConstructorArgument.cs" />
+    <Compile Include="NodeExtensions.cs" />
+    <Compile Include="ProtoinjectModule.cs" />
+    <Compile Include="RelativePositionalConstructorArgument.cs" />
     <Compile Include="StandardKernel.cs" />
     <Compile Include="UnresolvedArgumentType.cs" />
   </Files>
