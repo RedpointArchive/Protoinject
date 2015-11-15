@@ -36,6 +36,7 @@
     <Compile Include="IScope.cs" />
     <Compile Include="IUnresolvedArgument.cs" />
     <Compile Include="KernelExtensions.cs" />
+    <Compile Include="NamedAttribute.cs" />
     <Compile Include="NamedConstructorArgument.cs" />
     <Compile Include="NodeExtensions.cs" />
     <Compile Include="ProtoinjectModule.cs" />

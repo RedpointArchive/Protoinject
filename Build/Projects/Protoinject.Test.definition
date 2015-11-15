@@ -6,7 +6,8 @@
     <Reference Include="Prototest" />
   </References>
   <Files>
-    <Compile Include="FactoryTests.cs" />
+    <Compile Include="EntityFactoryTests.cs" />
+    <Compile Include="Fictional\DefaultGeneric.cs" />
     <Compile Include="Fictional\DefaultInput.cs" />
     <Compile Include="Fictional\DefaultInventory.cs" />
     <Compile Include="Fictional\DefaultMovement.cs" />
@@ -16,6 +17,8 @@
     <Compile Include="Fictional\Entity.cs" />
     <Compile Include="Fictional\IEntity.cs" />
     <Compile Include="Fictional\IEntityFactory.cs" />
+    <Compile Include="Fictional\IGeneric.cs" />
+    <Compile Include="Fictional\IGenericFactory.cs" />
     <Compile Include="Fictional\IInput.cs" />
     <Compile Include="Fictional\IInventory.cs" />
     <Compile Include="Fictional\IMovement.cs" />
@@ -28,5 +31,6 @@
     <Compile Include="Fictional\NetworkingPlayer.cs" />
     <Compile Include="Fictional\NetworkingSession.cs" />
     <Compile Include="Fictional\Player.cs" />
+    <Compile Include="GenericFactoryTests.cs" />
   </Files>
 </Project>

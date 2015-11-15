@@ -234,6 +234,44 @@ namespace Protoinject
                 {
                     throw new ActivationException("The planned node is not valid (hint: " + toCreate.InvalidHint + ")", plan);
                 }
+
+                var node = (DefaultNode)toCreate;
+                if (node.Planned && node.UntypedValue != null)
+                {
+                }
+                else if (node.Planned && node.PlannedMethod != null)
+                {
+                }
+                else if (node.Planned)
+                {
+                    foreach (var argument in node.PlannedConstructorArguments)
+                    {
+                        switch (argument.ArgumentType)
+                        {
+                            case UnresolvedArgumentType.Type:
+                                if (argument.IsMultipleResult)
+                                {
+                                    for (int index = 0; index < argument.PlannedTargets.Length; index++)
+                                    {
+                                        var target = argument.PlannedTargets[index];
+
+                                        if (!target.Valid)
+                                        {
+                                            throw new ActivationException("The planned node is not valid (hint: " + target.InvalidHint + ")", target);
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    if (!argument.PlannedTarget.Valid)
+                                    {
+                                        throw new ActivationException("The planned node is not valid (hint: " + argument.PlannedTarget.InvalidHint + ")", argument.PlannedTarget);
+                                    }
+                                }
+                                break;
+                        }
+                    }
+                }
             }
 
             // TODO: Validate more configuration
@@ -298,7 +336,7 @@ namespace Protoinject
                 else if (toCreate.Planned && toCreate.PlannedMethod != null)
                 {
                     toCreate.Planned = false;
-                    toCreate.UntypedValue = toCreate.PlannedMethod(new DefaultContext(((DefaultNode)node).Parent, node));
+                    toCreate.UntypedValue = toCreate.PlannedMethod(new DefaultContext(this, ((DefaultNode)node).Parent, node));
                 }
                 else if (toCreate.Planned)
                 {
@@ -409,9 +447,9 @@ namespace Protoinject
             switch (argument.ArgumentType)
             {
                 case UnresolvedArgumentType.Type:
-                    if (argument.UnresolvedType.IsArray)
+                    if (argument.IsMultipleResult)
                     {
-                        var value = (Array)Activator.CreateInstance(argument.UnresolvedType, new object[] { argument.PlannedTargets.Length });
+                        var value = (Array)Activator.CreateInstance(argument.MultipleResultElementType.MakeArrayType(), new object[] { argument.PlannedTargets.Length });
                         for (int index = 0; index < argument.PlannedTargets.Length; index++)
                         {
                             var target = argument.PlannedTargets[index];
@@ -462,6 +500,7 @@ namespace Protoinject
                 var nodeToCreate = typeof(DefaultNode<>).MakeGenericType(requestedType);
                 var createdNode = (DefaultNode)Activator.CreateInstance(nodeToCreate);
                 createdNode.Parent = current;
+                createdNode.Planned = true;
 
                 if (plans.Length == 0)
                 {
@@ -489,6 +528,14 @@ namespace Protoinject
             {
                 var resolvedMapping = resolvedMappings[i];
 
+                // If the resolved target is a generic type definition, we need to fill in the
+                // generic type arguments from the request.
+                var targetNonGeneric = resolvedMapping.Target;
+                if (targetNonGeneric != null && targetNonGeneric.IsGenericTypeDefinition)
+                {
+                    targetNonGeneric = targetNonGeneric.MakeGenericType(requestedType.GenericTypeArguments);
+                }
+
                 var scopeNode = current;
                 if (resolvedMapping.LifetimeScope != null)
                 {
@@ -498,7 +545,7 @@ namespace Protoinject
                 if (scopeNode != null && resolvedMapping.UniquePerScope)
                 {
                     var existing =
-                        scopeNode.Children.FirstOrDefault(x => x.Type.IsAssignableFrom(resolvedMapping.Target));
+                        scopeNode.Children.FirstOrDefault(x => x.Type.IsAssignableFrom(targetNonGeneric));
                     if (existing != null)
                     {
                         if (existing.Planned && existing.PlanRoot != planRoot)
@@ -514,9 +561,9 @@ namespace Protoinject
                 }
 
                 Type nodeToCreate;
-                if (resolvedMapping.Target != null)
+                if (targetNonGeneric != null)
                 {
-                    nodeToCreate = typeof (DefaultNode<>).MakeGenericType(resolvedMapping.Target);
+                    nodeToCreate = typeof (DefaultNode<>).MakeGenericType(targetNonGeneric);
                 }
                 else
                 {
@@ -526,9 +573,14 @@ namespace Protoinject
                 createdNode.Name = string.Empty;
                 createdNode.Parent = scopeNode;
                 createdNode.Planned = true;
-                createdNode.Type = resolvedMapping.Target ?? requestedType;
+                createdNode.Type = targetNonGeneric ?? requestedType;
                 createdNode.PlanName = planName;
                 createdNode.PlanRoot = planRoot;
+
+                if (createdNode.Type.ContainsGenericParameters)
+                {
+                    throw new InvalidOperationException("The type still contained generic type parameters even after initial binding resolution.");
+                }
 
                 // If there is no plan root, then we are the plan root.
                 if (planRoot == null)
@@ -548,6 +600,19 @@ namespace Protoinject
                     if (resolvedMapping.TargetFactory)
                     {
                         var attribute = createdNode.Type.GetCustomAttribute<GeneratedFactoryAttribute>();
+                        if (attribute == null)
+                        {
+                            // This node won't be valid because it's planned, has no value and
+                            // has no constructor.
+                            createdNode.InvalidHint = "The factory interface '" + createdNode.Type +
+                                                      "' doesn't have a generated factory for it.  " +
+                                                      "Make sure the factory interface inherits from " +
+                                                      "IGenerateFactory so that the generator will " +
+                                                      "implement it for you.";
+                            plans[i] = createdNode;
+                            continue;
+                        }
+
                         var resolvedFactoryClass =
                             createdNode.Type.Assembly.GetTypes()
                                 .FirstOrDefault(x => x.FullName == attribute.FullTypeName);
@@ -560,6 +625,13 @@ namespace Protoinject
                             plans[i] = createdNode;
                             continue;
                         }
+
+                        // If the factory class is generic, pass in type parameters as needed.
+                        if (resolvedFactoryClass != null && resolvedFactoryClass.IsGenericTypeDefinition)
+                        {
+                            resolvedFactoryClass = resolvedFactoryClass.MakeGenericType(requestedType.GenericTypeArguments);
+                        }
+
                         createdNode.Type = resolvedFactoryClass;
                     }
 
@@ -646,6 +718,7 @@ namespace Protoinject
                         {
                             plannedArgument.ArgumentType = UnresolvedArgumentType.Type;
                             plannedArgument.UnresolvedType = parameters[ii].ParameterType;
+                            plannedArgument.ParameterName = parameters[ii].GetCustomAttribute<NamedAttribute>()?.Name;
                         }
 
                         slots[ii] = plannedArgument;
@@ -658,12 +731,12 @@ namespace Protoinject
                         switch (argument.ArgumentType)
                         {
                             case UnresolvedArgumentType.Type:
-                                if (argument.UnresolvedType.IsArray)
+                                if (argument.IsMultipleResult)
                                 {
                                     var children = CreatePlans(
-                                        argument.UnresolvedType.GetElementType(),
+                                        argument.MultipleResultElementType,
                                         createdNode,
-                                        null,
+                                        argument.ParameterName,
                                         planName,
                                         planRoot,
                                         null);
@@ -684,7 +757,7 @@ namespace Protoinject
                                     var child = CreatePlan(
                                         argument.UnresolvedType,
                                         createdNode,
-                                        null,
+                                        argument.ParameterName,
                                         planName,
                                         planRoot,
                                         null);
@@ -748,6 +821,31 @@ namespace Protoinject
                     }
 
                     mappings.Add(b);
+                }
+            }
+
+            if (mappings.Count == 0)
+            {
+                if (originalType.IsGenericType && _bindings.ContainsKey(originalType.GetGenericTypeDefinition()))
+                {
+                    // Try the original generic type definition to see if we
+                    // need to pass generic parameters through.
+                    var bindings = _bindings[originalType.GetGenericTypeDefinition()];
+                    var sortedBindings = bindings.Where(x => x.Named == name)
+                        .OrderBy(x => x.OnlyUnderDescendantFilter != null ? 0 : 1);
+                    foreach (var b in sortedBindings)
+                    {
+                        if (b.OnlyUnderDescendantFilter != null)
+                        {
+                            var parents = b.OnlyUnderDescendantFilter.GetParents();
+                            if (!parents.Contains(current))
+                            {
+                                continue;
+                            }
+                        }
+
+                        mappings.Add(b);
+                    }
                 }
             }
 

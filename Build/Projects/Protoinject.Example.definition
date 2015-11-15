@@ -8,5 +8,6 @@
   <Files>
     <Compile Include="Program.cs" />
     <Compile Include="ReferenceEntityFactory.cs" />
+    <Compile Include="ReferenceGenericFactory.cs" />
   </Files>
 </Project>

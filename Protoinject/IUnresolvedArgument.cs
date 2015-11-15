@@ -15,5 +15,7 @@ namespace Protoinject
         IPlan[] PlannedTargets { get; }
         string ParameterName { get; }
         object KnownValue { get; }
+        bool IsMultipleResult { get; }
+        Type MultipleResultElementType { get; }
     }
 }

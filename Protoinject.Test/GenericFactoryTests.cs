@@ -1,21 +1,28 @@
-﻿using Protoinject.Example;
-using Prototest.Library.Version1;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace Protoinject.Test
 {
-    public class FactoryTests
+    using Protoinject.Example;
+    using Prototest.Library.Version1;
+
+    public class GenericFactoryTests
     {
         private readonly IAssert _assert;
 
-        public FactoryTests(IAssert assert)
+        public GenericFactoryTests(IAssert assert)
         {
-            _assert = assert;
+            this._assert = assert;
         }
 
         private IKernel CreateKernel()
         {
             var kernel = new StandardKernel();
-            kernel.Bind<IEntityFactory>().ToFactory();
+            kernel.Bind(typeof(IGenericFactory<,>)).ToFactory();
+            kernel.Bind(typeof(IGeneric<,>)).To(typeof(DefaultGeneric<,>));
             kernel.Bind<IPlayer>().To<Player>();
             kernel.Bind<INetworkingPlayer>().To<NetworkingPlayer>();
             kernel.Bind<IMovement>().To<DefaultMovement>();
@@ -27,7 +34,7 @@ namespace Protoinject.Test
         {
             var kernel = CreateKernel();
 
-            var factory = kernel.Get<IEntityFactory>();
+            var factory = kernel.Get<IGenericFactory<Player, DefaultWorld>>();
 
             _assert.NotNull(factory);
         }
@@ -36,7 +43,7 @@ namespace Protoinject.Test
         {
             var kernel = CreateKernel();
 
-            var factory = kernel.Get<IEntityFactory>();
+            var factory = kernel.Get<IGenericFactory<Player, DefaultWorld>>();
 
             _assert.NotNull(factory);
             _assert.True(factory.GetType().FullName.StartsWith("_GeneratedFactories"));
@@ -46,14 +53,14 @@ namespace Protoinject.Test
         {
             var kernel = CreateKernel();
 
-            var factory = kernel.Get<IEntityFactory>();
+            var factory = kernel.Get<IGenericFactory<Player, DefaultWorld>>();
 
             _assert.NotNull(factory);
 
-            var player = factory.CreatePlayer("test");
+            var generic = factory.CreateGeneric(null, "hello");
 
-            _assert.NotNull(player);
-            _assert.Equal("test", player.Name);
+            _assert.NotNull(generic);
+            _assert.IsType<DefaultGeneric<Player, string>>(generic);
         }
     }
 }

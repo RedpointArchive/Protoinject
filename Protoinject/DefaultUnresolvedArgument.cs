@@ -2,6 +2,8 @@ using System;
 
 namespace Protoinject
 {
+    using System.Collections.Generic;
+
     internal class DefaultUnresolvedArgument : IUnresolvedArgument
     {
         public UnresolvedArgumentType ArgumentType { get; set; }
@@ -15,5 +17,32 @@ namespace Protoinject
         public IPlan[] PlannedTargets { get; set; }
         public string ParameterName { get; set; }
         public object KnownValue { get; set; }
+
+        public bool IsMultipleResult
+        {
+            get
+            {
+                return UnresolvedType.IsArray
+                       || (UnresolvedType.IsGenericType
+                           && UnresolvedType.GetGenericTypeDefinition() == typeof(IEnumerable<>));
+            }
+        }
+
+        public Type MultipleResultElementType
+        {
+            get
+            {
+                if (UnresolvedType.IsArray)
+                {
+                    return UnresolvedType.GetElementType();
+                }
+                else if (UnresolvedType.IsGenericType && UnresolvedType.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                {
+                    return UnresolvedType.GenericTypeArguments[0];
+                }
+
+                throw new NotSupportedException();
+            }
+        }
     }
 }

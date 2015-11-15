@@ -5,5 +5,7 @@ namespace Protoinject
         INode Parent { get; }
 
         IPlan ChildToResolve { get; }
+
+        IKernel Kernel { get; }
     }
 }

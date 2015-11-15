@@ -6,6 +6,8 @@ using Mono.Cecil.Rocks;
 
 namespace Protoinject.FactoryGenerator
 {
+    using System.Collections.Generic;
+
     public static class Program
     {
         public static void Main(string[] args)
@@ -49,14 +51,31 @@ namespace Protoinject.FactoryGenerator
                 }
 
                 Console.WriteLine("Generating factory: " + type);
-
+                
                 var factory = new TypeDefinition(
                     "_GeneratedFactories",
-                    "Generated" + type.Name.Substring(1) + "<>",
+                    "Generated" + type.Name.Substring(1),
                     TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AnsiClass |
                     TypeAttributes.BeforeFieldInit);
                 factory.BaseType = @object;
-                factory.Interfaces.Add(type);
+
+                foreach (var gp in type.GenericParameters)
+                {
+                    var ngp = new GenericParameter(gp.Name, factory);
+                    ngp.Attributes = gp.Attributes;
+                    foreach (TypeReference gpc in gp.Constraints)
+                        ngp.Constraints.Add(gpc);
+                    factory.GenericParameters.Add(ngp);
+                }
+                
+                if (factory.GenericParameters.Count > 0)
+                {
+                    factory.Interfaces.Add(type.MakeGenericInstanceType(factory.GenericParameters.Cast<TypeReference>().ToArray()));
+                }
+                else
+                {
+                    factory.Interfaces.Add(type);
+                }
 
                 var currentField = new FieldDefinition("_current", FieldAttributes.Private | FieldAttributes.InitOnly, iNode);
                 factory.Fields.Add(currentField);
@@ -88,7 +107,7 @@ namespace Protoinject.FactoryGenerator
                 ctor.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
 
                 type.Module.Types.Add(factory);
-
+                
                 foreach (var method in type.Methods)
                 {
                     var impl = new MethodDefinition(method.Name,
@@ -96,6 +115,15 @@ namespace Protoinject.FactoryGenerator
                         MethodAttributes.NewSlot | MethodAttributes.Virtual,
                         method.ReturnType);
                     factory.Methods.Add(impl);
+                    
+                    foreach (var gp in method.GenericParameters)
+                    {
+                        var ngp = new GenericParameter(gp.Name, impl);
+                        ngp.Attributes = gp.Attributes;
+                        foreach (TypeReference gpc in gp.Constraints)
+                            ngp.Constraints.Add(gpc);
+                        impl.GenericParameters.Add(ngp);
+                    }
 
                     foreach (var p in method.Parameters)
                     {
@@ -122,6 +150,10 @@ namespace Protoinject.FactoryGenerator
                         impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4, i));
                         impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldstr, p.Name));
                         impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldarg, p));
+                        if (p.ParameterType.IsValueType || p.ParameterType.IsGenericParameter)
+                        {
+                            impl.Body.Instructions.Add(Instruction.Create(OpCodes.Box, p.ParameterType));
+                        }
                         impl.Body.Instructions.Add(Instruction.Create(OpCodes.Newobj, namedConstructorArgumentConstructor));
                         impl.Body.Instructions.Add(Instruction.Create(OpCodes.Stelem_Ref));
                         i++;
