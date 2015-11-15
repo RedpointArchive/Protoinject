@@ -12,6 +12,7 @@ namespace Protoinject
         public object FactoryArgumentValue { get; set; }
         public Delegate FactoryDelegate { get; set; }
         public IPlan PlannedTarget { get; set; }
+        public IPlan[] PlannedTargets { get; set; }
         public string ParameterName { get; set; }
         public object KnownValue { get; set; }
     }

@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
-using System.Runtime.CompilerServices;
+using System.Runtime.Hosting;
 
 namespace Protoinject
 {
@@ -20,6 +18,24 @@ namespace Protoinject
             _bindings = new Dictionary<Type, List<IMapping>>();
             _hierarchy = new DefaultHierarchy();
         }
+
+        public IHierarchy Hierarchy => _hierarchy;
+
+        #region Module Loading
+
+        public void Load<T>() where T : IProtoinjectModule
+        {
+            Activator.CreateInstance<T>().Load(this);
+        }
+
+        public void Load(IProtoinjectModule module)
+        {
+            module.Load(this);
+        }
+
+        #endregion
+
+        #region Binding / Unbinding
 
         public IBindToInScopeWithDescendantFilterOrUniqueOrNamed<TInterface> Bind<TInterface>()
         {
@@ -59,411 +75,58 @@ namespace Protoinject
 
         public void Unbind<T>()
         {
-            throw new NotImplementedException();
+            _bindings[typeof(T)] = new List<IMapping>();
         }
 
         public void Unbind(Type @interface)
         {
-            throw new NotImplementedException();
+            _bindings[@interface] = new List<IMapping>();
         }
 
-        public IHierarchy Hierarchy => _hierarchy;
+        #endregion
 
-        public IPlan<T> Plan<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
-        {
-            return (IPlan<T>) Plan(typeof (T), current, bindingName, planName, arguments);
-        }
-
-        public IPlan Plan(Type t, INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
-        {
-            return CreatePlan(t, current, bindingName, planName, null, arguments);
-        }
-
-        public void Validate<T>(IPlan<T> plan)
-        {
-            Validate((IPlan)plan);
-        }
-
-        public void Validate(IPlan plan)
-        {
-            if (!plan.Valid)
-            {
-                throw new ActivationException("The planned node is not valid (hint: " + plan.InvalidHint + ")", plan);
-            }
-
-            foreach (var toCreate in plan.PlannedCreatedNodes)
-            {
-                if (!toCreate.Valid)
-                {
-                    throw new ActivationException("The planned node is not valid (hint: " + toCreate.InvalidHint + ")", plan);
-                }
-            }
-
-            // TODO: Validate more configuration
-        }
-
-        public T Resolve<T>(IPlan<T> plan)
-        {
-            return ResolveToNode(plan).Value;
-        }
-
-        public object Resolve(IPlan plan)
-        {
-            return ResolveToNode(plan).UntypedValue;
-        }
-
-        public void Discard<T>(IPlan<T> plan)
-        {
-            Discard((IPlan)plan);
-        }
-
-        public void Discard(IPlan plan)
-        {
-            var planAsNode = (DefaultNode) plan;
-            planAsNode.Discarded = true;
-            foreach (var plan1 in planAsNode.PlannedCreatedNodes)
-            {
-                var toCreate = (DefaultNode) plan1;
-                var parent = toCreate.ParentPlan;
-                if (parent != null)
-                {
-                    ((DefaultNode) parent)?.ChildrenInternal.Remove((INode) toCreate);
-                }
-                else
-                {
-                    _hierarchy.RootNodes.Remove(toCreate);
-                }
-                toCreate.Parent = null;
-                toCreate.Discarded = true;
-            }
-            var nodeParent = planAsNode.ParentPlan;
-            if (nodeParent != null)
-            {
-                ((DefaultNode)nodeParent)?.ChildrenInternal.Remove(planAsNode);
-            }
-            else
-            {
-                _hierarchy.RootNodes.Remove(planAsNode);
-            }
-        }
-
-        public INode<T> ResolveToNode<T>(IPlan<T> plan)
-        {
-            return (INode<T>) ResolveToNode((IPlan) plan);
-        }
-
-        public INode ResolveToNode(IPlan plan)
-        {
-            if (!plan.Planned)
-            {
-                return (INode) plan;
-            }
-
-            foreach (var dependant in plan.DependentOnPlans)
-            {
-                if (dependant.Discarded)
-                {
-                    throw new ActivationException("This plan was dependant on plan '" + dependant.FullName + "' / '" +
-                                                  dependant.PlanName +
-                                                  "', but that plan has since been discarded.  Re-create this plan to resolve it.",
-                        plan);
-                }
-                else if (dependant.Planned)
-                {
-                    throw new ActivationException("This plan is dependant on plan '" + dependant.FullName + "' / '" +
-                                                  dependant.PlanName + "', but that plan is not resolved yet.", plan);
-                }
-            }
-
-            foreach (var node in plan.PlannedCreatedNodes)
-            {
-                var toCreate = (DefaultNode) node;
-                if (toCreate.Planned && toCreate.UntypedValue != null)
-                {
-                    // This is a factory.
-                    toCreate.Planned = false;
-                }
-                else if (toCreate.Planned)
-                {
-                    var parameters = new List<object>();
-                    foreach (var argument in toCreate.PlannedConstructorArguments)
-                    {
-                        parameters.Add(ResolveArgument(toCreate, argument));
-                    }
-                    toCreate.UntypedValue = toCreate.PlannedConstructor.Invoke(parameters.ToArray());
-                    toCreate.Planned = false;
-                }
-            }
-
-            return (INode) plan;
-        }
-
-        public IEnumerable<T> GetAll<T>()
-        {
-            throw new NotImplementedException();
-        }
-
-        public IEnumerable GetAll(Type type)
-        {
-            throw new NotImplementedException();
-        }
-
-        private object ResolveArgument(DefaultNode toCreate, IUnresolvedArgument argument)
-        {
-            switch (argument.ArgumentType)
-            {
-                case UnresolvedArgumentType.Type:
-                    if (argument.PlannedTarget.Planned)
-                    {
-                        throw new ActivationException(
-                            "Expected " + argument.PlannedTarget.FullName + " to be resolved by now.", toCreate);
-                    }
-                    return ((DefaultNode) argument.PlannedTarget).UntypedValue;
-                case UnresolvedArgumentType.Factory:
-                    return argument.FactoryDelegate;
-                case UnresolvedArgumentType.FactoryArgument:
-                    return argument.FactoryArgumentValue;
-                case UnresolvedArgumentType.CurrentNode:
-                    return argument.CurrentNode;
-                case UnresolvedArgumentType.KnownValue:
-                    return argument.KnownValue;
-            }
-
-            throw new ActivationException("Unexpected argument type", toCreate);
-        }
-
-        private IPlan CreatePlan(Type requestedType, INode current, string bindingName, string planName, INode planRoot, IConstructorArgument[] arguments)
-        {
-            var resolvedMapping = ResolveType(requestedType, bindingName, current);
-
-            var scopeNode = current;
-            if (resolvedMapping.LifetimeScope != null)
-            {
-                scopeNode = resolvedMapping.LifetimeScope.GetContainingNode();
-            }
-
-            if (scopeNode != null && resolvedMapping.UniquePerScope)
-            {
-                var existing = scopeNode.Children.FirstOrDefault(x => x.Type.IsAssignableFrom(resolvedMapping.Target));
-                if (existing != null)
-                {
-                    if (existing.Planned)
-                    {
-                        // Flag that the plan root is now dependant on the other
-                        // plan being resolved.
-                        planRoot?.DependentOnPlans.Add(existing.PlanRoot);
-                    }
-
-                    return existing;
-                }
-            }
-
-            Type nodeToCreate;
-            if (resolvedMapping.Target != null)
-            {
-                nodeToCreate = typeof(DefaultNode<>).MakeGenericType(resolvedMapping.Target);
-            }
-            else
-            {
-                nodeToCreate = typeof(DefaultNode<>).MakeGenericType(requestedType);
-            }
-            var createdNode = (DefaultNode) Activator.CreateInstance(nodeToCreate);
-            createdNode.Name = string.Empty;
-            createdNode.Parent = scopeNode;
-            createdNode.Planned = true;
-            createdNode.Type = resolvedMapping.Target ?? requestedType;
-            createdNode.PlanName = planName;
-            createdNode.PlanRoot = planRoot;
-
-            // If there is no plan root, then we are the plan root.
-            if (planRoot == null)
-            {
-                planRoot = createdNode;
-            }
-
-            try
-            {
-                // TODO: Handle ToMethod mappings.
-
-                if (resolvedMapping.TargetFactory)
-                {
-                    var attribute = createdNode.Type.GetCustomAttribute<GeneratedFactoryAttribute>();
-                    var resolvedFactoryClass = createdNode.Type.Assembly.GetTypes().FirstOrDefault(x => x.FullName == attribute.FullTypeName);
-                    if (resolvedFactoryClass == null)
-                    {
-                        // This node won't be valid because it's planned, has no value and
-                        // has no constructor.
-                        createdNode.InvalidHint = "The generated factory class '" + attribute.FullTypeName +
-                                                  "' could not be found in the assembly.";
-                        return createdNode;
-                    }
-                    createdNode.Type = resolvedFactoryClass;
-                }
-
-                if (createdNode.Type == null)
-                {
-                    // This node won't be valid because it's planned, has no value and
-                    // has no constructor.
-                    createdNode.InvalidHint = "There was no valid target for the binding (is the 'To' method missing?)";
-                    return createdNode;
-                }
-
-                createdNode.PlannedConstructor =
-                    createdNode.Type.GetConstructors(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault();
-                if (createdNode.PlannedConstructor == null)
-                {
-                    // This node won't be valid because it's planned, has no value and
-                    // has no constructor.
-                    createdNode.InvalidHint = "There was no valid public constructor for '" + createdNode.Type.FullName + "'";
-                    return createdNode;
-                }
-
-                createdNode.PlannedConstructorArguments = new List<IUnresolvedArgument>();
-
-                var parameters = createdNode.PlannedConstructor.GetParameters();
-
-                var slots = new DefaultUnresolvedArgument[parameters.Length];
-
-                // First apply additional constructor arguments to the slots.
-                if (arguments != null)
-                {
-                    foreach (var additional in arguments)
-                    {
-                        for (var s = 0; s < slots.Length; s++)
-                        {
-                            if (additional.Satisifies(createdNode.PlannedConstructor, parameters[s]))
-                            {
-                                var plannedArgument = new DefaultUnresolvedArgument();
-                                plannedArgument.ArgumentType = UnresolvedArgumentType.FactoryArgument;
-                                plannedArgument.FactoryArgumentValue = additional.GetValue();
-                                slots[s] = plannedArgument;
-                            }
-                        }
-                    }
-                }
-
-                for (var i = 0; i < slots.Length; i++)
-                {
-                    if (slots[i] != null)
-                    {
-                        // Already filled in.
-                        continue;
-                    }
-
-                    var parameter = parameters[i];
-
-                    var plannedArgument = new DefaultUnresolvedArgument();
-                    plannedArgument.ParameterName = parameter.Name;
-
-                    if (parameter.ParameterType == typeof (ICurrentNode))
-                    {
-                        plannedArgument.ArgumentType = UnresolvedArgumentType.CurrentNode;
-                        plannedArgument.CurrentNode = new DefaultCurrentNode(createdNode);
-                    }
-                    else if (parameter.ParameterType == typeof(IKernel))
-                    {
-                        plannedArgument.ArgumentType = UnresolvedArgumentType.KnownValue;
-                        plannedArgument.KnownValue = this;
-                    }
-                    else
-                    {
-                        plannedArgument.ArgumentType = UnresolvedArgumentType.Type;
-                        plannedArgument.UnresolvedType = parameters[i].ParameterType;
-                    }
-
-                    slots[i] = plannedArgument;
-                }
-
-                createdNode.PlannedConstructorArguments = new List<IUnresolvedArgument>(slots);
-
-                foreach (var argument in createdNode.PlannedConstructorArguments)
-                {
-                    switch (argument.ArgumentType)
-                    {
-                        case UnresolvedArgumentType.Type:
-                            var child = CreatePlan(
-                                argument.UnresolvedType,
-                                createdNode, 
-                                null,
-                                planName, 
-                                planRoot,
-                                null);
-                            if (child.ParentPlan == createdNode)
-                            {
-                                createdNode.ChildrenInternal.Add((INode) child);
-                            }
-                            ((DefaultUnresolvedArgument) argument).PlannedTarget = child;
-                            break;
-                    }
-                }
-
-                if (createdNode.Parent == null)
-                {
-                    _hierarchy.RootNodes.Add(createdNode);
-                }
-                else //if (scopeNode != current)
-                {
-                    ((DefaultNode) scopeNode).ChildrenInternal.Add(createdNode);
-                }
-
-                return createdNode;
-            }
-            finally
-            {
-                planRoot.PlannedCreatedNodes.Add(createdNode);
-            }
-        }
-
-        private IMapping ResolveType(Type originalType, string name, INode current)
-        {
-            // Try to resolve the type using bindings first.
-            if (_bindings.ContainsKey(originalType))
-            {
-                var bindings = _bindings[originalType];
-                var sortedBindings = bindings.Where(x => x.Named == name)
-                    .OrderBy(x => x.OnlyUnderDescendantFilter != null ? 0 : 1);
-                foreach (var b in sortedBindings)
-                {
-                    if (b.OnlyUnderDescendantFilter != null)
-                    {
-                        var parents = b.OnlyUnderDescendantFilter.GetParents();
-                        if (!parents.Contains(current))
-                        {
-                            continue;
-                        }
-                    }
-
-                    return b;
-                }
-            }
-
-            // If the type is a concrete type, return it.
-            if (!originalType.IsAbstract && !originalType.IsInterface)
-            {
-                return new DefaultMapping
-                {
-                    Target = originalType
-                };
-            }
-
-            // We can't resolve this type.
-            return new InvalidMapping();
-        }
+        #region Scope / Node Control
 
         public IScope CreateScopeFromNode(INode node)
         {
             return new FixedScope(node);
         }
 
-        public void Load<T>() where T : IProtoinjectModule
+        public INode CreateEmptyNode(string name, INode parent = null)
         {
-            Activator.CreateInstance<T>().Load(this);
+            var node = new DefaultNode
+            {
+                Parent = parent,
+                Name = DefaultNode.NormalizeName(name)
+            };
+            if (parent == null)
+            {
+                _hierarchy.RootNodes.Add(node);
+            }
+            else
+            {
+                var childrenInternal = ((DefaultNode)parent).ChildrenInternal;
+                if (!childrenInternal.Contains(node))
+                {
+                    childrenInternal.Add(node);
+                }
+            }
+            return node;
         }
 
-        public void Load(IProtoinjectModule module)
+        public IScope GetSingletonScope()
         {
-            module.Load(this);
+            if (_singletonScope == null)
+            {
+                _singletonScope = CreateScopeFromNode(CreateEmptyNode("Singletons"));
+            }
+
+            return _singletonScope;
         }
+
+        #endregion
+
+        #region Get / TryGet / GetAll
 
         public T Get<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
         {
@@ -511,32 +174,598 @@ namespace Protoinject
             }
         }
 
-        public INode CreateEmptyNode(string name, INode parent = null)
+        public T[] GetAll<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
         {
-            var node = new DefaultNode
+            var plans = PlanAll<T>(current, bindingName, planName, arguments);
+            ValidateAll(plans);
+            return ResolveAll(plans);
+        }
+
+        public object[] GetAll(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        {
+            var plans = PlanAll(type, current, bindingName, planName, arguments);
+            ValidateAll(plans);
+            return ResolveAll(plans);
+        }
+
+        #endregion
+
+        #region Planning
+
+        public IPlan<T> Plan<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        {
+            return (IPlan<T>) Plan(typeof (T), current, bindingName, planName, arguments);
+        }
+
+        public IPlan Plan(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        {
+            return CreatePlan(type, current, bindingName, planName, null, arguments);
+        }
+
+        public IPlan<T>[] PlanAll<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        {
+            return (IPlan<T>[])PlanAll(typeof(T), current, bindingName, planName, arguments);
+        }
+
+        public IPlan[] PlanAll(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        {
+            return CreatePlans(type, current, bindingName, planName, null, arguments);
+        }
+
+        #endregion
+
+        #region Validation
+
+        public void Validate<T>(IPlan<T> plan)
+        {
+            Validate((IPlan)plan);
+        }
+
+        public void Validate(IPlan plan)
+        {
+            if (!plan.Valid)
             {
-                Parent = parent,
-                Name = DefaultNode.NormalizeName(name)
-            };
-            if (parent == null)
+                throw new ActivationException("The planned node is not valid (hint: " + plan.InvalidHint + ")", plan);
+            }
+
+            foreach (var toCreate in plan.PlannedCreatedNodes)
             {
-                _hierarchy.RootNodes.Add(node);
+                if (!toCreate.Valid)
+                {
+                    throw new ActivationException("The planned node is not valid (hint: " + toCreate.InvalidHint + ")", plan);
+                }
+            }
+
+            // TODO: Validate more configuration
+        }
+
+        public void ValidateAll<T>(IPlan<T>[] plans)
+        {
+            foreach (var plan in plans)
+            {
+                Validate(plan);
+            }
+        }
+
+        public void ValidateAll(IPlan[] plans)
+        {
+            foreach (var plan in plans)
+            {
+                Validate(plan);
+            }
+        }
+
+        #endregion
+
+        #region Resolution
+
+        public INode<T> ResolveToNode<T>(IPlan<T> plan)
+        {
+            return (INode<T>)ResolveToNode((IPlan)plan);
+        }
+
+        public INode ResolveToNode(IPlan plan)
+        {
+            if (!plan.Planned)
+            {
+                return (INode)plan;
+            }
+
+            foreach (var dependant in plan.DependentOnPlans)
+            {
+                if (dependant.Discarded)
+                {
+                    throw new ActivationException("This plan was dependant on plan '" + dependant.FullName + "' / '" +
+                                                  dependant.PlanName +
+                                                  "', but that plan has since been discarded.  Re-create this plan to resolve it.",
+                        plan);
+                }
+                else if (dependant.Planned)
+                {
+                    throw new ActivationException("This plan is dependant on plan '" + dependant.FullName + "' / '" +
+                                                  dependant.PlanName + "', but that plan is not resolved yet.", plan);
+                }
+            }
+
+            foreach (var node in plan.PlannedCreatedNodes)
+            {
+                var toCreate = (DefaultNode)node;
+                if (toCreate.Planned && toCreate.UntypedValue != null)
+                {
+                    // This is a factory.
+                    toCreate.Planned = false;
+                }
+                else if (toCreate.Planned && toCreate.PlannedMethod != null)
+                {
+                    toCreate.Planned = false;
+                    toCreate.UntypedValue = toCreate.PlannedMethod(new DefaultContext(((DefaultNode)node).Parent, node));
+                }
+                else if (toCreate.Planned)
+                {
+                    var parameters = new List<object>();
+                    foreach (var argument in toCreate.PlannedConstructorArguments)
+                    {
+                        parameters.Add(ResolveArgument(toCreate, argument));
+                    }
+                    toCreate.UntypedValue = toCreate.PlannedConstructor.Invoke(parameters.ToArray());
+                    toCreate.Planned = false;
+                }
+            }
+
+            return (INode)plan;
+        }
+
+        public INode<T>[] ResolveAllToNode<T>(IPlan<T>[] plans)
+        {
+            return plans.Select(ResolveToNode).ToArray();
+        }
+
+        public INode[] ResolveAllToNode(IPlan[] plans)
+        {
+            return plans.Select(ResolveToNode).ToArray();
+        }
+
+        public T Resolve<T>(IPlan<T> plan)
+        {
+            return ResolveToNode(plan).Value;
+        }
+
+        public object Resolve(IPlan plan)
+        {
+            return ResolveToNode(plan).UntypedValue;
+        }
+
+        public T[] ResolveAll<T>(IPlan<T>[] plans)
+        {
+            return plans.Select(Resolve).ToArray();
+        }
+
+        public object[] ResolveAll(IPlan[] plans)
+        {
+            return plans.Select(Resolve).ToArray();
+        }
+
+        #endregion
+
+        #region Discard
+
+        public void Discard<T>(IPlan<T> plan)
+        {
+            Discard((IPlan)plan);
+        }
+
+        public void Discard(IPlan plan)
+        {
+            var planAsNode = (DefaultNode) plan;
+            planAsNode.Discarded = true;
+            foreach (var plan1 in planAsNode.PlannedCreatedNodes)
+            {
+                var toCreate = (DefaultNode) plan1;
+                var parent = toCreate.ParentPlan;
+                if (parent != null)
+                {
+                    ((DefaultNode) parent)?.ChildrenInternal.Remove((INode) toCreate);
+                }
+                else
+                {
+                    _hierarchy.RootNodes.Remove(toCreate);
+                }
+                toCreate.Parent = null;
+                toCreate.Discarded = true;
+            }
+            var nodeParent = planAsNode.ParentPlan;
+            if (nodeParent != null)
+            {
+                ((DefaultNode)nodeParent)?.ChildrenInternal.Remove(planAsNode);
             }
             else
             {
-                ((DefaultNode) parent).ChildrenInternal.Add(node);
+                _hierarchy.RootNodes.Remove(planAsNode);
             }
-            return node;
         }
 
-        public IScope GetSingletonScope()
+        public void DiscardAll<T>(IPlan<T>[] plans)
         {
-            if (_singletonScope == null)
+            foreach (var plan in plans)
             {
-                _singletonScope = CreateScopeFromNode(CreateEmptyNode("Singletons"));
+                Discard(plan);
+            }
+        }
+
+        public void DiscardAll(IPlan[] plans)
+        {
+            foreach (var plan in plans)
+            {
+                Discard(plan);
+            }
+        }
+
+        #endregion
+
+        #region Internals
+
+        private object ResolveArgument(DefaultNode toCreate, IUnresolvedArgument argument)
+        {
+            switch (argument.ArgumentType)
+            {
+                case UnresolvedArgumentType.Type:
+                    if (argument.UnresolvedType.IsArray)
+                    {
+                        var value = (Array)Activator.CreateInstance(argument.UnresolvedType, new object[] { argument.PlannedTargets.Length });
+                        for (int index = 0; index < argument.PlannedTargets.Length; index++)
+                        {
+                            var target = argument.PlannedTargets[index];
+
+                            if (target.Planned)
+                            {
+                                throw new ActivationException(
+                                    "Expected " + target.FullName + " to be resolved by now.", toCreate);
+                            }
+
+                            value.SetValue(((DefaultNode)target).UntypedValue, index);
+                        }
+                        return value;
+                    }
+                    else
+                    {
+                        if (argument.PlannedTarget.Planned)
+                        {
+                            throw new ActivationException(
+                                "Expected " + argument.PlannedTarget.FullName + " to be resolved by now.", toCreate);
+                        }
+                        return ((DefaultNode)argument.PlannedTarget).UntypedValue;
+                    }
+                case UnresolvedArgumentType.Factory:
+                    return argument.FactoryDelegate;
+                case UnresolvedArgumentType.FactoryArgument:
+                    return argument.FactoryArgumentValue;
+                case UnresolvedArgumentType.CurrentNode:
+                    return argument.CurrentNode;
+                case UnresolvedArgumentType.KnownValue:
+                    return argument.KnownValue;
             }
 
-            return _singletonScope;
+            throw new ActivationException("Unexpected argument type", toCreate);
         }
+
+        private IPlan CreatePlan(Type requestedType, INode current, string bindingName, string planName,
+            INode planRoot, IConstructorArgument[] arguments)
+        {
+            var plans = CreatePlans(requestedType, current, bindingName, planName, planRoot, arguments);
+            if (plans.Length != 1)
+            {
+                foreach (var plan in plans)
+                {
+                    Discard(plan);
+                }
+
+                var nodeToCreate = typeof(DefaultNode<>).MakeGenericType(requestedType);
+                var createdNode = (DefaultNode)Activator.CreateInstance(nodeToCreate);
+                createdNode.Parent = current;
+
+                if (plans.Length == 0)
+                {
+                    createdNode.InvalidHint = "Expected one binding for '" + requestedType +
+                                              "' but no types were bound.";
+                }
+                else
+                {
+                    createdNode.InvalidHint = "Expected only one binding for '" + requestedType +
+                                              "' but multiple types were bound.";
+                }
+
+                return createdNode;
+            }
+
+            return plans[0];
+        }
+
+        private IPlan[] CreatePlans(Type requestedType, INode current, string bindingName, string planName, INode planRoot, IConstructorArgument[] arguments)
+        {
+            var resolvedMappings = ResolveTypes(requestedType, bindingName, current);
+            var plans = (IPlan[])Activator.CreateInstance(typeof(IPlan<>).MakeGenericType(requestedType).MakeArrayType(), resolvedMappings.Length);
+
+            for (var i = 0; i < resolvedMappings.Length; i++)
+            {
+                var resolvedMapping = resolvedMappings[i];
+
+                var scopeNode = current;
+                if (resolvedMapping.LifetimeScope != null)
+                {
+                    scopeNode = resolvedMapping.LifetimeScope.GetContainingNode();
+                }
+
+                if (scopeNode != null && resolvedMapping.UniquePerScope)
+                {
+                    var existing =
+                        scopeNode.Children.FirstOrDefault(x => x.Type.IsAssignableFrom(resolvedMapping.Target));
+                    if (existing != null)
+                    {
+                        if (existing.Planned && existing.PlanRoot != planRoot)
+                        {
+                            // Flag that the plan root is now dependant on the other
+                            // plan being resolved.
+                            planRoot?.DependentOnPlans.Add(existing.PlanRoot);
+                        }
+
+                        plans[i] = existing;
+                        continue;
+                    }
+                }
+
+                Type nodeToCreate;
+                if (resolvedMapping.Target != null)
+                {
+                    nodeToCreate = typeof (DefaultNode<>).MakeGenericType(resolvedMapping.Target);
+                }
+                else
+                {
+                    nodeToCreate = typeof (DefaultNode<>).MakeGenericType(requestedType);
+                }
+                var createdNode = (DefaultNode) Activator.CreateInstance(nodeToCreate);
+                createdNode.Name = string.Empty;
+                createdNode.Parent = scopeNode;
+                createdNode.Planned = true;
+                createdNode.Type = resolvedMapping.Target ?? requestedType;
+                createdNode.PlanName = planName;
+                createdNode.PlanRoot = planRoot;
+
+                // If there is no plan root, then we are the plan root.
+                if (planRoot == null)
+                {
+                    planRoot = createdNode;
+                }
+
+                try
+                {
+                    if (resolvedMapping.TargetMethod != null)
+                    {
+                        createdNode.PlannedMethod = resolvedMapping.TargetMethod;
+                        plans[i] = createdNode;
+                        continue;
+                    }
+
+                    if (resolvedMapping.TargetFactory)
+                    {
+                        var attribute = createdNode.Type.GetCustomAttribute<GeneratedFactoryAttribute>();
+                        var resolvedFactoryClass =
+                            createdNode.Type.Assembly.GetTypes()
+                                .FirstOrDefault(x => x.FullName == attribute.FullTypeName);
+                        if (resolvedFactoryClass == null)
+                        {
+                            // This node won't be valid because it's planned, has no value and
+                            // has no constructor.
+                            createdNode.InvalidHint = "The generated factory class '" + attribute.FullTypeName +
+                                                      "' could not be found in the assembly.";
+                            plans[i] = createdNode;
+                            continue;
+                        }
+                        createdNode.Type = resolvedFactoryClass;
+                    }
+
+                    if (createdNode.Type == null)
+                    {
+                        // This node won't be valid because it's planned, has no value and
+                        // has no constructor.
+                        createdNode.InvalidHint =
+                            "There was no valid target for the binding (is the 'To' method missing?)";
+                        plans[i] = createdNode;
+                        continue;
+                    }
+
+                    if (createdNode.Type == requestedType && (requestedType.IsInterface || requestedType.IsAbstract))
+                    {
+                        // This node won't be valid because it's planned, has no value and
+                        // has no constructor.
+                        createdNode.InvalidHint =
+                            "The target type '" + requestedType + "' isn't valid because it can't be constructed.";
+                        plans[i] = createdNode;
+                        continue;
+                    }
+
+                    createdNode.PlannedConstructor =
+                        createdNode.Type.GetConstructors(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault();
+                    if (createdNode.PlannedConstructor == null)
+                    {
+                        // This node won't be valid because it's planned, has no value and
+                        // has no constructor.
+                        createdNode.InvalidHint = "There was no valid public constructor for '" +
+                                                  createdNode.Type.FullName + "'";
+                        plans[i] = createdNode;
+                        continue;
+                    }
+
+                    createdNode.PlannedConstructorArguments = new List<IUnresolvedArgument>();
+
+                    var parameters = createdNode.PlannedConstructor.GetParameters();
+
+                    var slots = new DefaultUnresolvedArgument[parameters.Length];
+
+                    // First apply additional constructor arguments to the slots.
+                    if (arguments != null)
+                    {
+                        foreach (var additional in arguments)
+                        {
+                            for (var s = 0; s < slots.Length; s++)
+                            {
+                                if (additional.Satisifies(createdNode.PlannedConstructor, parameters[s]))
+                                {
+                                    var plannedArgument = new DefaultUnresolvedArgument();
+                                    plannedArgument.ArgumentType = UnresolvedArgumentType.FactoryArgument;
+                                    plannedArgument.FactoryArgumentValue = additional.GetValue();
+                                    slots[s] = plannedArgument;
+                                }
+                            }
+                        }
+                    }
+
+                    for (var ii = 0; ii < slots.Length; ii++)
+                    {
+                        if (slots[ii] != null)
+                        {
+                            // Already filled in.
+                            continue;
+                        }
+
+                        var parameter = parameters[ii];
+
+                        var plannedArgument = new DefaultUnresolvedArgument();
+                        plannedArgument.ParameterName = parameter.Name;
+
+                        if (parameter.ParameterType == typeof (ICurrentNode))
+                        {
+                            plannedArgument.ArgumentType = UnresolvedArgumentType.CurrentNode;
+                            plannedArgument.CurrentNode = new DefaultCurrentNode(createdNode);
+                        }
+                        else if (parameter.ParameterType == typeof (IKernel))
+                        {
+                            plannedArgument.ArgumentType = UnresolvedArgumentType.KnownValue;
+                            plannedArgument.KnownValue = this;
+                        }
+                        else
+                        {
+                            plannedArgument.ArgumentType = UnresolvedArgumentType.Type;
+                            plannedArgument.UnresolvedType = parameters[ii].ParameterType;
+                        }
+
+                        slots[ii] = plannedArgument;
+                    }
+
+                    createdNode.PlannedConstructorArguments = new List<IUnresolvedArgument>(slots);
+
+                    foreach (var argument in createdNode.PlannedConstructorArguments)
+                    {
+                        switch (argument.ArgumentType)
+                        {
+                            case UnresolvedArgumentType.Type:
+                                if (argument.UnresolvedType.IsArray)
+                                {
+                                    var children = CreatePlans(
+                                        argument.UnresolvedType.GetElementType(),
+                                        createdNode,
+                                        null,
+                                        planName,
+                                        planRoot,
+                                        null);
+                                    foreach (var child in children)
+                                    {
+                                        if (child.ParentPlan == createdNode)
+                                        {
+                                            if (!createdNode.ChildrenInternal.Contains((INode)child))
+                                            {
+                                                createdNode.ChildrenInternal.Add((INode)child);
+                                            }
+                                        }
+                                    }
+                                    ((DefaultUnresolvedArgument)argument).PlannedTargets = children;
+                                }
+                                else
+                                {
+                                    var child = CreatePlan(
+                                        argument.UnresolvedType,
+                                        createdNode,
+                                        null,
+                                        planName,
+                                        planRoot,
+                                        null);
+                                    if (child.ParentPlan == createdNode)
+                                    {
+                                        if (!createdNode.ChildrenInternal.Contains((INode)child))
+                                        {
+                                            createdNode.ChildrenInternal.Add((INode)child);
+                                        }
+                                    }
+                                    ((DefaultUnresolvedArgument)argument).PlannedTarget = child;
+                                }
+
+                                break;
+                        }
+                    }
+
+                    if (createdNode.Parent == null)
+                    {
+                        _hierarchy.RootNodes.Add(createdNode);
+                    }
+                    else
+                    {
+                        var childrenInternal = ((DefaultNode)scopeNode).ChildrenInternal;
+                        if (!childrenInternal.Contains(createdNode))
+                        {
+                            childrenInternal.Add(createdNode);
+                        }
+                    }
+
+                    plans[i] = createdNode;
+                }
+                finally
+                {
+                    planRoot.PlannedCreatedNodes.Add(createdNode);
+                }
+            }
+
+            return plans;
+        }
+
+        private IMapping[] ResolveTypes(Type originalType, string name, INode current)
+        {
+            var mappings = new List<IMapping>();
+
+            // Try to resolve the type using bindings first.
+            if (_bindings.ContainsKey(originalType))
+            {
+                var bindings = _bindings[originalType];
+                var sortedBindings = bindings.Where(x => x.Named == name)
+                    .OrderBy(x => x.OnlyUnderDescendantFilter != null ? 0 : 1);
+                foreach (var b in sortedBindings)
+                {
+                    if (b.OnlyUnderDescendantFilter != null)
+                    {
+                        var parents = b.OnlyUnderDescendantFilter.GetParents();
+                        if (!parents.Contains(current))
+                        {
+                            continue;
+                        }
+                    }
+
+                    mappings.Add(b);
+                }
+            }
+
+            if (mappings.Count == 0)
+            {
+                // If the type is a concrete type, return it.
+                if (!originalType.IsAbstract && !originalType.IsInterface)
+                {
+                    mappings.Add(new DefaultMapping
+                    {
+                        Target = originalType
+                    });
+                }
+            }
+            
+            return mappings.ToArray();
+        }
+
+        #endregion
     }
 }

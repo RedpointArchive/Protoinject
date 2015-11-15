@@ -90,7 +90,50 @@ namespace Protoinject
         {
             return kernel.TryGet(type, current, null, null, arguments);
         }
+        
+        public static T[] GetAll<T>(this IKernel kernel, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAll<T>(null, null, null, arguments);
+        }
 
+        public static T[] GetAll<T>(this IKernel kernel, string bindingName, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAll<T>(null, bindingName, null, arguments);
+        }
+
+        public static T[] GetAll<T>(this IKernel kernel, INode current, string bindingName,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAll<T>(current, bindingName, null, arguments);
+        }
+
+        public static T[] GetAll<T>(this IKernel kernel, INode current, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAll<T>(current, null, null, arguments);
+        }
+
+        public static object[] GetAll(this IKernel kernel, Type type, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAll(type, null, null, null, arguments);
+        }
+
+        public static object[] GetAll(this IKernel kernel, Type type, string bindingName,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAll(type, null, bindingName, null, arguments);
+        }
+
+        public static object[] GetAll(this IKernel kernel, Type type, INode current, string bindingName,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAll(type, current, bindingName, null, arguments);
+        }
+
+        public static object[] GetAll(this IKernel kernel, Type type, INode current, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAll(type, current, null, null, arguments);
+        }
+        
         public static IBindToInScopeWithDescendantFilterOrUniqueOrNamed<T> Rebind<T>(this IKernel kernel)
         {
             kernel.Unbind<T>();

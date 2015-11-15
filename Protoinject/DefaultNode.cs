@@ -50,7 +50,7 @@ namespace Protoinject
             {
                 if (this.Planned)
                 {
-                    return UntypedValue != null || PlannedConstructor != null;
+                    return UntypedValue != null || PlannedConstructor != null || PlannedMethod != null;
                 }
 
                 return !Discarded;
@@ -92,6 +92,7 @@ namespace Protoinject
 
         public List<IUnresolvedArgument> PlannedConstructorArguments { get; set; }
         public string InvalidHint { get; set; }
+        public Func<IContext, object> PlannedMethod { get; set; }
 
         public static string NormalizeName(string name)
         {

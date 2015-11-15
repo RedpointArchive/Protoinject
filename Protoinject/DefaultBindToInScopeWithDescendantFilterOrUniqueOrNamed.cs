@@ -26,6 +26,10 @@ namespace Protoinject
         {
             _kernel = kernel;
             _mapping = defaultMapping;
+
+            // This makes the most sense by default; when using ToFactory
+            // it gets set to false implicitly.
+            _mapping.UniquePerScope = true;
         }
 
         protected IBindInScopeWithDescendantFilterOrUniqueOrNamed To<T>()
@@ -54,6 +58,7 @@ namespace Protoinject
         public IBindInScopeWithDescendantFilterOrUniqueOrNamed ToFactory()
         {
             _mapping.TargetFactory = true;
+            _mapping.UniquePerScope = false;
             return this;
         }
 
@@ -77,6 +82,11 @@ namespace Protoinject
         public void EnforceOnePerScope()
         {
             _mapping.UniquePerScope = true;
+        }
+
+        public void AllowManyPerScope()
+        {
+            _mapping.UniquePerScope = false;
         }
 
         public IBindInScopeOrUnique WithDescendantFilter(INode descendantOf)

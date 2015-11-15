@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Net.Configuration;
 using System.Reflection;
@@ -17,6 +18,8 @@ namespace Protoinject
         ConstructorInfo PlannedConstructor { get; }
 
         List<IUnresolvedArgument> PlannedConstructorArguments { get; }
+
+        Func<IContext, object> PlannedMethod { get; set; }
 
         List<IPlan> PlannedCreatedNodes { get; }
 
