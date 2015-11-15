@@ -6,26 +6,27 @@
     <Reference Include="Prototest" />
   </References>
   <Files>
-    <Compile Include="DefaultInput.cs" />
-    <Compile Include="DefaultInventory.cs" />
-    <Compile Include="DefaultMovement.cs" />
-    <Compile Include="DefaultProfiler.cs" />
-    <Compile Include="DefaultProfilerUtil.cs" />
-    <Compile Include="DefaultWorld.cs" />
-    <Compile Include="Entity.cs" />
-    <Compile Include="IEntity.cs" />
-    <Compile Include="IEntityFactory.cs" />
-    <Compile Include="IInput.cs" />
-    <Compile Include="IInventory.cs" />
-    <Compile Include="IMovement.cs" />
-    <Compile Include="INetworkingPlayer.cs" />
-    <Compile Include="INetworkingSession.cs" />
-    <Compile Include="IPlayer.cs" />
-    <Compile Include="IProfiler.cs" />
-    <Compile Include="IProfilerUtil.cs" />
-    <Compile Include="IWorld.cs" />
-    <Compile Include="NetworkingPlayer.cs" />
-    <Compile Include="NetworkingSession.cs" />
-    <Compile Include="Player.cs" />
+    <Compile Include="FactoryTests.cs" />
+    <Compile Include="Fictional\DefaultInput.cs" />
+    <Compile Include="Fictional\DefaultInventory.cs" />
+    <Compile Include="Fictional\DefaultMovement.cs" />
+    <Compile Include="Fictional\DefaultProfiler.cs" />
+    <Compile Include="Fictional\DefaultProfilerUtil.cs" />
+    <Compile Include="Fictional\DefaultWorld.cs" />
+    <Compile Include="Fictional\Entity.cs" />
+    <Compile Include="Fictional\IEntity.cs" />
+    <Compile Include="Fictional\IEntityFactory.cs" />
+    <Compile Include="Fictional\IInput.cs" />
+    <Compile Include="Fictional\IInventory.cs" />
+    <Compile Include="Fictional\IMovement.cs" />
+    <Compile Include="Fictional\INetworkingPlayer.cs" />
+    <Compile Include="Fictional\INetworkingSession.cs" />
+    <Compile Include="Fictional\IPlayer.cs" />
+    <Compile Include="Fictional\IProfiler.cs" />
+    <Compile Include="Fictional\IProfilerUtil.cs" />
+    <Compile Include="Fictional\IWorld.cs" />
+    <Compile Include="Fictional\NetworkingPlayer.cs" />
+    <Compile Include="Fictional\NetworkingSession.cs" />
+    <Compile Include="Fictional\Player.cs" />
   </Files>
 </Project>
