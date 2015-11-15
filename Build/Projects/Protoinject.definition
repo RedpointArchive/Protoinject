@@ -13,8 +13,8 @@
     <Compile Include="DefaultMapping.cs" />
     <Compile Include="DefaultNode.cs" />
     <Compile Include="DefaultUnresolvedArgument.cs" />
-    <Compile Include="FactoryProxy.cs" />
     <Compile Include="FixedScope.cs" />
+    <Compile Include="GeneratedFactoryAttribute.cs" />
     <Compile Include="IBindInScope.cs" />
     <Compile Include="IBindInScopeOrUnique.cs" />
     <Compile Include="IBindInScopeWithDescendantFilterOrUnique.cs" />
@@ -26,6 +26,7 @@
     <Compile Include="IConstructorArgument.cs" />
     <Compile Include="IContext.cs" />
     <Compile Include="ICurrentNode.cs" />
+    <Compile Include="IGenerateFactory.cs" />
     <Compile Include="IHierarchy.cs" />
     <Compile Include="IKernel.cs" />
     <Compile Include="IMapping.cs" />

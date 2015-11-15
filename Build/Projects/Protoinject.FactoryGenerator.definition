@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Name="Protoinject.FactoryGenerator" Path="Protoinject.FactoryGenerator" Type="Console" Platforms="Windows,MacOS,Linux" PostBuildHook="True">
+  <Properties>
+    <PostBuildHookExcludes>
+      <Project Name="Protoinject" />
+    </PostBuildHookExcludes>
+  </Properties>
+  <References>
+    <Reference Include="System" />
+    <Reference Include="Mono.Cecil" />
+    <Reference Include="Protoinject" />
+  </References>
+  <Files>
+    <Compile Include="Program.cs" />
+  </Files>
+</Project>

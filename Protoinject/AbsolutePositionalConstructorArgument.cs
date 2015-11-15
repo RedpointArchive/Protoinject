@@ -13,7 +13,7 @@ namespace Protoinject
             _value = value;
         }
 
-        public bool Satisifies(ConstructorInfo constructor, ParameterInfo parameter, int relativePosition)
+        public bool Satisifies(ConstructorInfo constructor, ParameterInfo parameter)
         {
             return parameter.Position == _position;
         }

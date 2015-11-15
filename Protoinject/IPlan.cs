@@ -29,6 +29,8 @@ namespace Protoinject
         bool Discarded { get; }
 
         bool Valid { get; }
+
+        string InvalidHint { get; }
     }
 
     public interface IPlan<out T> : IPlan

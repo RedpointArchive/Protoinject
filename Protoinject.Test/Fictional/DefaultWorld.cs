@@ -7,13 +7,13 @@ namespace Protoinject.Example
         public DefaultWorld(
             IProfiler profiler,
             INetworkingSession networkSession,
-            Func<string, Player> playerFactory,
+            IEntityFactory playerFactory,
             ICurrentNode currentNode)
         {
             currentNode.SetName("AmazingWorld");
 
-            playerFactory("Player1");
-            playerFactory("Player2");
+            playerFactory.CreatePlayer("Player1");
+            playerFactory.CreatePlayer("Player2");
         }
     }
 }

@@ -35,7 +35,7 @@ namespace Protoinject
                 return
                     GetParents()
                         .Concat(new[] {this})
-                        .Select(x => string.IsNullOrWhiteSpace(x.Name) ? ("(" + x.Type.FullName + ")") : x.Name)
+                        .Select(x => string.IsNullOrWhiteSpace(x.Name) ? (x.Type == null ? "(unknown)" : ("(" + x.Type.FullName + ")")) : x.Name)
                         .Aggregate((a, b) => a + "/" + b);
             }
         }
@@ -91,6 +91,7 @@ namespace Protoinject
         public ConstructorInfo PlannedConstructor { get; set; }
 
         public List<IUnresolvedArgument> PlannedConstructorArguments { get; set; }
+        public string InvalidHint { get; set; }
 
         public static string NormalizeName(string name)
         {

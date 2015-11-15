@@ -13,5 +13,10 @@
         {
             _target.Name = name;
         }
+
+        public INode GetNodeForFactoryImplementation()
+        {
+            return _target;
+        }
     }
 }

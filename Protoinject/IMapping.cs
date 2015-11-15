@@ -8,6 +8,8 @@ namespace Protoinject
 
         Func<IContext, object> TargetMethod { get; }
 
+        bool TargetFactory { get; }
+
         INode OnlyUnderDescendantFilter { get; }
 
         IScope LifetimeScope { get; }

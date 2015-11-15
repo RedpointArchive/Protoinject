@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Name="Protoinject.Test" Path="Protoinject.Test" Type="Console">
+  <References>
+    <Reference Include="System" />
+    <Reference Include="Protoinject" />
+    <Reference Include="Prototest" />
+  </References>
+  <Files>
+    <Compile Include="DefaultInput.cs" />
+    <Compile Include="DefaultInventory.cs" />
+    <Compile Include="DefaultMovement.cs" />
+    <Compile Include="DefaultProfiler.cs" />
+    <Compile Include="DefaultProfilerUtil.cs" />
+    <Compile Include="DefaultWorld.cs" />
+    <Compile Include="Entity.cs" />
+    <Compile Include="IEntity.cs" />
+    <Compile Include="IEntityFactory.cs" />
+    <Compile Include="IInput.cs" />
+    <Compile Include="IInventory.cs" />
+    <Compile Include="IMovement.cs" />
+    <Compile Include="INetworkingPlayer.cs" />
+    <Compile Include="INetworkingSession.cs" />
+    <Compile Include="IPlayer.cs" />
+    <Compile Include="IProfiler.cs" />
+    <Compile Include="IProfilerUtil.cs" />
+    <Compile Include="IWorld.cs" />
+    <Compile Include="NetworkingPlayer.cs" />
+    <Compile Include="NetworkingSession.cs" />
+    <Compile Include="Player.cs" />
+  </Files>
+</Project>

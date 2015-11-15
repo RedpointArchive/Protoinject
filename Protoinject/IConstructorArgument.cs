@@ -4,7 +4,7 @@ namespace Protoinject
 {
     public interface IConstructorArgument
     {
-        bool Satisifies(ConstructorInfo constructor, ParameterInfo parameter, int relativePosition);
+        bool Satisifies(ConstructorInfo constructor, ParameterInfo parameter);
 
         object GetValue();
     }

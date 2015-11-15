@@ -6,6 +6,7 @@ namespace Protoinject
     {
         public Type Target { get; }
         public Func<IContext, object> TargetMethod { get; }
+        public bool TargetFactory { get; }
         public INode OnlyUnderDescendantFilter { get; }
         public IScope LifetimeScope { get; }
         public bool UniquePerScope { get; }

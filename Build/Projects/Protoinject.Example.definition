@@ -3,28 +3,10 @@
   <References>
     <Reference Include="System" />
     <Reference Include="Protoinject" />
+    <Reference Include="Protoinject.Test" />
   </References>
   <Files>
-    <Compile Include="DefaultInput.cs" />
-    <Compile Include="DefaultInventory.cs" />
-    <Compile Include="DefaultMovement.cs" />
-    <Compile Include="DefaultProfiler.cs" />
-    <Compile Include="DefaultProfilerUtil.cs" />
-    <Compile Include="DefaultWorld.cs" />
-    <Compile Include="Entity.cs" />
-    <Compile Include="IEntity.cs" />
-    <Compile Include="IInput.cs" />
-    <Compile Include="IInventory.cs" />
-    <Compile Include="IMovement.cs" />
-    <Compile Include="INetworkingPlayer.cs" />
-    <Compile Include="INetworkingSession.cs" />
-    <Compile Include="IPlayer.cs" />
-    <Compile Include="IProfiler.cs" />
-    <Compile Include="IProfilerUtil.cs" />
-    <Compile Include="IWorld.cs" />
-    <Compile Include="NetworkingPlayer.cs" />
-    <Compile Include="NetworkingSession.cs" />
-    <Compile Include="Player.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="ReferenceEntityFactory.cs" />
   </Files>
 </Project>

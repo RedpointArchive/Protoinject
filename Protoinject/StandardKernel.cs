@@ -88,14 +88,14 @@ namespace Protoinject
         {
             if (!plan.Valid)
             {
-                throw new ActivationException("The planned node is not valid", plan);
+                throw new ActivationException("The planned node is not valid (hint: " + plan.InvalidHint + ")", plan);
             }
 
             foreach (var toCreate in plan.PlannedCreatedNodes)
             {
                 if (!toCreate.Valid)
                 {
-                    throw new ActivationException("The planned node is not valid", plan);
+                    throw new ActivationException("The planned node is not valid (hint: " + toCreate.InvalidHint + ")", plan);
                 }
             }
 
@@ -283,23 +283,28 @@ namespace Protoinject
 
             try
             {
-                if (resolvedMapping.Target != null)
+                // TODO: Handle ToMethod mappings.
+
+                if (resolvedMapping.TargetFactory)
                 {
-                    // If the type is System.Func or similar, create it as a factory.
-                    if (resolvedMapping.Target.FullName.StartsWith("System.Func`"))
+                    var attribute = createdNode.Type.GetCustomAttribute<GeneratedFactoryAttribute>();
+                    var resolvedFactoryClass = createdNode.Type.Assembly.GetTypes().FirstOrDefault(x => x.FullName == attribute.FullTypeName);
+                    if (resolvedFactoryClass == null)
                     {
-                        createdNode.PlannedConstructor = null;
-                        createdNode.UntypedValue = CreateFuncFactory(createdNode.Type, current);
+                        // This node won't be valid because it's planned, has no value and
+                        // has no constructor.
+                        createdNode.InvalidHint = "The generated factory class '" + attribute.FullTypeName +
+                                                  "' could not be found in the assembly.";
                         return createdNode;
                     }
+                    createdNode.Type = resolvedFactoryClass;
                 }
-
-                // TODO: Handle ToMethod and ToFactory mappings.
 
                 if (createdNode.Type == null)
                 {
                     // This node won't be valid because it's planned, has no value and
                     // has no constructor.
+                    createdNode.InvalidHint = "There was no valid target for the binding (is the 'To' method missing?)";
                     return createdNode;
                 }
 
@@ -309,15 +314,42 @@ namespace Protoinject
                 {
                     // This node won't be valid because it's planned, has no value and
                     // has no constructor.
+                    createdNode.InvalidHint = "There was no valid public constructor for '" + createdNode.Type.FullName + "'";
                     return createdNode;
                 }
 
                 createdNode.PlannedConstructorArguments = new List<IUnresolvedArgument>();
 
                 var parameters = createdNode.PlannedConstructor.GetParameters();
-                var paramCount = parameters.Length - (arguments?.Length ?? 0);
-                for (var i = 0; i < paramCount; i++)
+
+                var slots = new DefaultUnresolvedArgument[parameters.Length];
+
+                // First apply additional constructor arguments to the slots.
+                if (arguments != null)
                 {
+                    foreach (var additional in arguments)
+                    {
+                        for (var s = 0; s < slots.Length; s++)
+                        {
+                            if (additional.Satisifies(createdNode.PlannedConstructor, parameters[s]))
+                            {
+                                var plannedArgument = new DefaultUnresolvedArgument();
+                                plannedArgument.ArgumentType = UnresolvedArgumentType.FactoryArgument;
+                                plannedArgument.FactoryArgumentValue = additional.GetValue();
+                                slots[s] = plannedArgument;
+                            }
+                        }
+                    }
+                }
+
+                for (var i = 0; i < slots.Length; i++)
+                {
+                    if (slots[i] != null)
+                    {
+                        // Already filled in.
+                        continue;
+                    }
+
                     var parameter = parameters[i];
 
                     var plannedArgument = new DefaultUnresolvedArgument();
@@ -333,32 +365,16 @@ namespace Protoinject
                         plannedArgument.ArgumentType = UnresolvedArgumentType.KnownValue;
                         plannedArgument.KnownValue = this;
                     }
-                    else if (parameter.ParameterType.FullName.StartsWith("System.Func`"))
-                    {
-                        plannedArgument.ArgumentType = UnresolvedArgumentType.Factory;
-                        plannedArgument.UnresolvedType = parameter.ParameterType;
-                        plannedArgument.FactoryDelegate = CreateFuncFactory(plannedArgument.UnresolvedType, createdNode);
-                        plannedArgument.FactoryType = plannedArgument.FactoryDelegate.Method.ReturnType;
-                    }
                     else
                     {
                         plannedArgument.ArgumentType = UnresolvedArgumentType.Type;
                         plannedArgument.UnresolvedType = parameters[i].ParameterType;
                     }
 
-                    createdNode.PlannedConstructorArguments.Add(plannedArgument);
+                    slots[i] = plannedArgument;
                 }
 
-                if (arguments != null)
-                {
-                    foreach (var additional in arguments)
-                    {
-                        var plannedArgument = new DefaultUnresolvedArgument();
-                        plannedArgument.ArgumentType = UnresolvedArgumentType.FactoryArgument;
-                        plannedArgument.FactoryArgumentValue = additional;
-                        createdNode.PlannedConstructorArguments.Add(plannedArgument);
-                    }
-                }
+                createdNode.PlannedConstructorArguments = new List<IUnresolvedArgument>(slots);
 
                 foreach (var argument in createdNode.PlannedConstructorArguments)
                 {
@@ -432,41 +448,6 @@ namespace Protoinject
 
             // We can't resolve this type.
             return new InvalidMapping();
-        }
-
-        private object FactoryResolve(Type typeToCreate, INode current, IConstructorArgument[] parameters)
-        {
-            var plan = Plan(
-                typeToCreate,
-                current,
-                null,
-                "<via factory>", 
-                parameters.Select((x, i) => new RelativePositionalConstructorArgument(i, x)).OfType<IConstructorArgument>().ToArray());
-            Validate(plan);
-            return Resolve(plan);
-        }
-
-        private Delegate CreateFuncFactory(Type factoryType, INode current = null)
-        {
-            var genericArguments = factoryType.GetGenericArguments();
-            var funcArgumentCount = genericArguments.Length - 1;
-
-            var targetType = genericArguments[funcArgumentCount];
-            var get = this.GetType().GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
-                .First(x => x.Name == "FactoryResolve" && !x.IsGenericMethod);
-            var args = new List<Expression>();
-            args.Add(Expression.Constant(targetType, typeof(Type)));
-            args.Add(Expression.Constant(current, typeof(INode)));
-            var @params = new List<ParameterExpression>();
-            for (var n = 0; n < funcArgumentCount; n++)
-            {
-                @params.Add(Expression.Parameter(genericArguments[n]));
-            }
-            args.Add(Expression.NewArrayInit(typeof (IConstructorArgument), @params));
-            var call = Expression.Call(Expression.Constant(this), get, args);
-            var cast = Expression.Convert(call, targetType);
-            var lambda = Expression.Lambda(cast, @params);
-            return lambda.Compile();
         }
 
         public IScope CreateScopeFromNode(INode node)
