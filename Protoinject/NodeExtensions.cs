@@ -37,7 +37,7 @@ namespace Protoinject
             {
                 me += GetDebugRepresentation(c, indent + "  ");
             }
-            if (current.Planned)
+            if (current.Planned && current.PlannedConstructorArguments != null)
             {
                 foreach (var p in current.PlannedConstructorArguments)
                 {

@@ -39,6 +39,7 @@
     <Compile Include="NamedAttribute.cs" />
     <Compile Include="NamedConstructorArgument.cs" />
     <Compile Include="NodeExtensions.cs" />
+    <Compile Include="OptionalAttribute.cs" />
     <Compile Include="ProtoinjectModule.cs" />
     <Compile Include="StandardKernel.cs" />
     <Compile Include="UnresolvedArgumentType.cs" />

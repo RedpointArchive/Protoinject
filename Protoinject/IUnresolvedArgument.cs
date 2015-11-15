@@ -17,5 +17,6 @@ namespace Protoinject
         object KnownValue { get; }
         bool IsMultipleResult { get; }
         Type MultipleResultElementType { get; }
+        bool IsOptional { get; }
     }
 }

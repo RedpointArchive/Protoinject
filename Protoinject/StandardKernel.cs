@@ -255,7 +255,7 @@ namespace Protoinject
                                     {
                                         var target = argument.PlannedTargets[index];
 
-                                        if (!target.Valid)
+                                        if (!argument.IsOptional && !target.Valid)
                                         {
                                             throw new ActivationException("The planned node is not valid (hint: " + target.InvalidHint + ")", target);
                                         }
@@ -263,7 +263,7 @@ namespace Protoinject
                                 }
                                 else
                                 {
-                                    if (!argument.PlannedTarget.Valid)
+                                    if (!argument.IsOptional && !argument.PlannedTarget.Valid)
                                     {
                                         throw new ActivationException("The planned node is not valid (hint: " + argument.PlannedTarget.InvalidHint + ")", argument.PlannedTarget);
                                     }
@@ -468,8 +468,15 @@ namespace Protoinject
                     {
                         if (argument.PlannedTarget.Planned)
                         {
-                            throw new ActivationException(
-                                "Expected " + argument.PlannedTarget.FullName + " to be resolved by now.", toCreate);
+                            if (argument.IsOptional)
+                            {
+                                return null;
+                            }
+                            else
+                            {
+                                throw new ActivationException(
+                                    "Expected " + argument.PlannedTarget.FullName + " to be resolved by now.", toCreate);
+                            }
                         }
                         return ((DefaultNode)argument.PlannedTarget).UntypedValue;
                     }
@@ -719,6 +726,7 @@ namespace Protoinject
                             plannedArgument.ArgumentType = UnresolvedArgumentType.Type;
                             plannedArgument.UnresolvedType = parameters[ii].ParameterType;
                             plannedArgument.ParameterName = parameters[ii].GetCustomAttribute<NamedAttribute>()?.Name;
+                            plannedArgument.IsOptional = parameters[ii].GetCustomAttribute<OptionalAttribute>() != null;
                         }
 
                         slots[ii] = plannedArgument;

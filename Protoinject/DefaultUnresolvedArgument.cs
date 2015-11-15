@@ -44,5 +44,7 @@ namespace Protoinject
                 throw new NotSupportedException();
             }
         }
+
+        public bool IsOptional { get; set; }
     }
 }
