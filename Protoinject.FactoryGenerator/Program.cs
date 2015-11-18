@@ -3,6 +3,7 @@ using System.Linq;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Cecil.Rocks;
+using System.IO;
 
 namespace Protoinject.FactoryGenerator
 {
@@ -10,31 +11,87 @@ namespace Protoinject.FactoryGenerator
 
     public static class Program
     {
+        /// <remarks>
+        /// We can't use Import because it finds the type in the current framework, not the
+        /// framework that the assembly is referencing.
+        /// </remarks>
+        private static TypeDefinition FindTypeInModuleOrReferences(AssemblyDefinition assembly, string name, List<string> visited = null, AssemblyDefinition original = null)
+        {
+            if (visited == null)
+            {
+                visited = new List<string>();
+            }
+
+            if (original == null)
+            {
+                original = assembly;
+            }
+
+            visited.Add(assembly.FullName);
+
+            foreach (var module in assembly.Modules)
+            {
+                var definedType = module.Types.FirstOrDefault(x => x.FullName == name);
+                if (definedType != null)
+                {
+                    Console.WriteLine("Resolved type '" + name + "' as " + definedType.FullName + " (in " + assembly.FullName + ")");
+                    return definedType;
+                }
+
+                foreach (var @ref in module.AssemblyReferences)
+                {
+                    if (visited.Contains(@ref.FullName)) 
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        return FindTypeInModuleOrReferences(module.AssemblyResolver.Resolve(@ref), name, visited, original);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+
+            throw new Exception("Unable to resolve '" + name + "'");
+        }
+
         public static void Main(string[] args)
         {
-            var assembly = AssemblyDefinition.ReadAssembly(args[0], new ReaderParameters {ReadSymbols = true});
+            var resolver = new DefaultAssemblyResolver();
+            resolver.AddSearchDirectory(new FileInfo(args[0]).DirectoryName);
+            var assembly = AssemblyDefinition.ReadAssembly(args[0], new ReaderParameters {ReadSymbols = true, AssemblyResolver = resolver});
             Console.WriteLine("Generating factories for " + assembly.FullName + "...");
 
-            var iGenerateFactory = assembly.MainModule.Import(typeof (IGenerateFactory));
-            var iNode = assembly.MainModule.Import(typeof (INode));
-            var iKernel = assembly.MainModule.Import(typeof (IKernel));
-            var iCurrentNode = assembly.MainModule.Import(typeof(ICurrentNode));
-            var @object = assembly.MainModule.Import(typeof(object));
-            var @string = assembly.MainModule.Import(typeof(string));
-            var objectConstructor = assembly.MainModule.Import(typeof(object).GetConstructor(new Type[0]));
+            var iGenerateFactory = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.IGenerateFactory"));
+            var iNode = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.INode"));
+            var iKernelDef = FindTypeInModuleOrReferences(assembly, "Protoinject.IKernel");
+            var iCurrentNodeDef = FindTypeInModuleOrReferences(assembly, "Protoinject.ICurrentNode");
+            var @object = assembly.MainModule.TypeSystem.Object;
+            var @string = assembly.MainModule.TypeSystem.String;
+            var objectConstructor = assembly.MainModule.Import(assembly.MainModule.TypeSystem.Object.Resolve().GetConstructors().First());
             var getNodeForFactoryImplementation = 
-                assembly.MainModule.Import(typeof(ICurrentNode).GetMethod("GetNodeForFactoryImplementation"));
-            var getTypeFromHandle = assembly.MainModule.Import(typeof (Type).GetMethod("GetTypeFromHandle"));
-            var iConstructorArgument = assembly.MainModule.Import(typeof(IConstructorArgument));
-            var namedConstructorArgumentConstructor =
-                assembly.MainModule.Import(
-                    typeof (NamedConstructorArgument).GetConstructor(new Type[] {typeof (string), typeof (object)}));
-            var kernelGet = assembly.MainModule.Import(
-                typeof (IKernel).GetMethod("Get",
-                    new Type[]
-                    {typeof (Type), typeof (INode), typeof (string), typeof (string), typeof (IConstructorArgument[])}));
+                assembly.MainModule.Import(iCurrentNodeDef.GetMethods().First(x => x.Name == "GetNodeForFactoryImplementation"));
+            var getTypeFromHandle = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "System.Type").GetMethods().First(x => x.Name == "GetTypeFromHandle"));
+            var iConstructorArgument = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.IConstructorArgument"));
+            var namedConstructorArgumentConstructor = assembly.MainModule.Import(
+                FindTypeInModuleOrReferences(assembly, "Protoinject.NamedConstructorArgument")
+                .GetConstructors().First());
+            var kernelGet = assembly.MainModule.Import(iKernelDef.GetMethods().First(x => 
+                x.Name == "Get" &&
+                x.Parameters.Count == 5 &&
+                x.Parameters[0].ParameterType.Name == "Type" &&
+                x.Parameters[1].ParameterType.Name == "INode" &&
+                x.Parameters[2].ParameterType.Name == "String" &&
+                x.Parameters[3].ParameterType.Name == "String"));
             var generatedFactoryAttributeConstructor = assembly.MainModule.Import(
-                typeof(GeneratedFactoryAttribute).GetConstructor(new []{typeof(string)}));
+                FindTypeInModuleOrReferences(assembly, "Protoinject.GeneratedFactoryAttribute").GetConstructors()
+                .First());
+
+            var iCurrentNode = assembly.MainModule.Import(iCurrentNodeDef);
+            var iKernel = assembly.MainModule.Import(iKernelDef);
 
             var modified = false;
 
@@ -173,7 +230,7 @@ namespace Protoinject.FactoryGenerator
 
             if (modified)
             {
-                assembly.Write(args[0], new WriterParameters {WriteSymbols = true});
+                assembly.Write(args[0] + ".new", new WriterParameters {WriteSymbols = true});
             }
         }
     }
