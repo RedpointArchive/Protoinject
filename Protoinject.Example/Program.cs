@@ -1,7 +1,8 @@
-﻿#if PLATFORM_IOS
+﻿using System;
+
+#if PLATFORM_IOS
 using UIKit;
 #else
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
