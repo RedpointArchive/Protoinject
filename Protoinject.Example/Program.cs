@@ -1,8 +1,12 @@
-﻿using System;
+﻿#if PLATFORM_IOS
+using UIKit;
+#else
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+#endif
 
 namespace Protoinject.Example
 {
@@ -10,6 +14,9 @@ namespace Protoinject.Example
     {
         public static void Main(string[] args)
         {
+#if PLATFORM_IOS
+            UIApplication.Main(args, null, "AppDelegate");
+#else
             var kernel = new StandardKernel();
 
             var controllers = kernel.CreateScopeFromNode(kernel.CreateEmptyNode("Controllers"));
@@ -66,6 +73,7 @@ namespace Protoinject.Example
             {
                 Console.Write(root.GetDebugRepresentation());
             }
+#endif
         }
 
         private static Random random = new Random();
