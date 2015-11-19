@@ -31,13 +31,13 @@ namespace Protoinject.FactoryGenerator
 
             foreach (var module in assembly.Modules)
             {
-                var definedType = module.Types.FirstOrDefault(x => x.FullName == name);
+                TypeDefinition definedType = module.Types.FirstOrDefault(x => x.FullName == name);
                 if (definedType != null)
                 {
                     Console.WriteLine("Resolved type '" + name + "' as " + definedType.FullName + " (in " + assembly.FullName + ")");
                     return definedType;
                 }
-
+                
                 foreach (var @ref in module.AssemblyReferences)
                 {
                     if (visited.Contains(@ref.FullName)) 
@@ -45,9 +45,11 @@ namespace Protoinject.FactoryGenerator
                         continue;
                     }
 
+                    var assemblyResolved = module.AssemblyResolver.Resolve(@ref);
+
                     try
                     {
-                        return FindTypeInModuleOrReferences(module.AssemblyResolver.Resolve(@ref), name, visited, original);
+                        return FindTypeInModuleOrReferences(assemblyResolved, name, visited, original);
                     }
                     catch
                     {
@@ -60,11 +62,16 @@ namespace Protoinject.FactoryGenerator
 
         public static void Main(string[] args)
         {
-            var resolver = new DefaultAssemblyResolver();
-            resolver.AddSearchDirectory(new FileInfo(args[0]).DirectoryName);
+            var resolver = new PreloadedAssemblyResolver();
+            foreach (var reference in args[1].Split(';'))
+            {
+                Console.WriteLine("Loading referenced assembly from " + reference + "...");
+                resolver.Load(reference);
+            }
+
             var assembly = AssemblyDefinition.ReadAssembly(args[0], new ReaderParameters {ReadSymbols = true, AssemblyResolver = resolver});
             Console.WriteLine("Generating factories for " + assembly.FullName + "...");
-
+            
             var iGenerateFactory = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.IGenerateFactory"));
             var iNode = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.INode"));
             var iKernelDef = FindTypeInModuleOrReferences(assembly, "Protoinject.IKernel");

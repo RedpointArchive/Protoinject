@@ -2,6 +2,7 @@
 <Project Name="Protoinject.Test" Path="Protoinject.Test" Type="Console">
   <References>
     <Reference Include="System" />
+    <Reference Include="System.Core" />
     <Reference Include="Protoinject" />
     <Reference Include="Prototest" />
   </References>

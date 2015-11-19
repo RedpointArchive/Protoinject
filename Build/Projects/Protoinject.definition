@@ -2,6 +2,7 @@
 <Project Name="Protoinject" Path="Protoinject" Type="Library">
   <References>
     <Reference Include="System" />
+    <Reference Include="System.Core" />
   </References>
   <Files>
     <Compile Include="AbsolutePositionalConstructorArgument.cs" />

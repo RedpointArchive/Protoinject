@@ -7,10 +7,12 @@
   </Properties>
   <References>
     <Reference Include="System" />
+    <Reference Include="System.Core" />
     <Reference Include="Mono.Cecil" />
     <Reference Include="Protoinject" />
   </References>
   <Files>
+    <Compile Include="PreloadedAssemblyResolver.cs" />
     <Compile Include="Program.cs" />
   </Files>
 </Project>
