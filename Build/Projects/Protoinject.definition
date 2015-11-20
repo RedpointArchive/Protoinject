@@ -42,6 +42,9 @@
     <Compile Include="NodeExtensions.cs" />
     <Compile Include="OptionalAttribute.cs" />
     <Compile Include="ProtoinjectModule.cs" />
+    <Compile Include="Resources\Resource.Designer.cs">
+      <Platforms>Android,Ouya</Platforms>
+    </Compile>
     <Compile Include="StandardKernel.cs" />
     <Compile Include="UnresolvedArgumentType.cs" />
   </Files>
