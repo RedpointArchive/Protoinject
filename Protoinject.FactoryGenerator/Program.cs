@@ -237,7 +237,8 @@ namespace Protoinject.FactoryGenerator
 
             if (modified)
             {
-                assembly.Write(args[0] + ".new", new WriterParameters {WriteSymbols = true});
+                Console.WriteLine("Saving assembly: " + args[0]);
+                assembly.Write(args[0], new WriterParameters {WriteSymbols = true});
             }
         }
     }
