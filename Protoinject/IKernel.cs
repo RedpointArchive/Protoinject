@@ -14,6 +14,7 @@ namespace Protoinject
         INode CreateEmptyNode(string name, INode parent = null);
         IScope CreateScopeFromNode(INode node);
 
+        void Load<T>() where T : IProtoinjectModule;
         void Load(IProtoinjectModule module);
         
         T Get<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
