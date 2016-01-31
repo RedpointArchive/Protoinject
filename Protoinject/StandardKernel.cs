@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Runtime.Hosting;
 
 namespace Protoinject
@@ -345,7 +346,14 @@ namespace Protoinject
                     {
                         parameters.Add(ResolveArgument(toCreate, argument));
                     }
-                    toCreate.UntypedValue = toCreate.PlannedConstructor.Invoke(parameters.ToArray());
+                    try
+                    {
+                        toCreate.UntypedValue = toCreate.PlannedConstructor.Invoke(parameters.ToArray());
+                    }
+                    catch (TargetInvocationException ex)
+                    {
+                        ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+                    }
                     toCreate.Planned = false;
                 }
             }
