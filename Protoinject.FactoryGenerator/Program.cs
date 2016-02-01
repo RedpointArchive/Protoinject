@@ -69,7 +69,12 @@ namespace Protoinject.FactoryGenerator
                 resolver.Load(reference);
             }
 
-            var assembly = AssemblyDefinition.ReadAssembly(args[0], new ReaderParameters {ReadSymbols = true, AssemblyResolver = resolver});
+            var readSymbols =
+                File.Exists(Path.Combine(Path.GetDirectoryName(args[0]),
+                    Path.GetFileNameWithoutExtension(args[0]) + ".pdb")) ||
+                File.Exists(Path.Combine(Path.GetDirectoryName(args[0]),
+                    Path.GetFileNameWithoutExtension(args[0]) + ".dll.mdb"));
+            var assembly = AssemblyDefinition.ReadAssembly(args[0], new ReaderParameters {ReadSymbols = readSymbols, AssemblyResolver = resolver});
             Console.WriteLine("Generating factories for " + assembly.FullName + "...");
             
             var iGenerateFactory = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.IGenerateFactory"));
@@ -238,7 +243,7 @@ namespace Protoinject.FactoryGenerator
             if (modified)
             {
                 Console.WriteLine("Saving assembly: " + args[0]);
-                assembly.Write(args[0], new WriterParameters {WriteSymbols = true});
+                assembly.Write(args[0], new WriterParameters {WriteSymbols = readSymbols });
             }
         }
     }
