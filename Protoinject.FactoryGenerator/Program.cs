@@ -77,7 +77,20 @@ namespace Protoinject.FactoryGenerator
             var assembly = AssemblyDefinition.ReadAssembly(args[0], new ReaderParameters {ReadSymbols = readSymbols, AssemblyResolver = resolver});
             Console.WriteLine("Generating factories for " + assembly.FullName + "...");
             
-            var iGenerateFactory = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.IGenerateFactory"));
+            TypeReference iGenerateFactory;
+            try
+            {
+                iGenerateFactory =
+                    assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.IGenerateFactory"));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    "Unable to resolve IGenerateFactory; this usually means the assembly does not use or reference " +
+                    "Protoinject at all.  Skipping....");
+                return;
+            }
+
             var iNode = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.INode"));
             var iKernelDef = FindTypeInModuleOrReferences(assembly, "Protoinject.IKernel");
             var iCurrentNodeDef = FindTypeInModuleOrReferences(assembly, "Protoinject.ICurrentNode");
