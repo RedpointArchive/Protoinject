@@ -560,7 +560,7 @@ namespace Protoinject
                 if (scopeNode != null && resolvedMapping.UniquePerScope)
                 {
                     var existing =
-                        scopeNode.Children.FirstOrDefault(x => x.Type.IsAssignableFrom(targetNonGeneric));
+                        scopeNode.Children.FirstOrDefault(x => x.Type != null && x.Type.IsAssignableFrom(targetNonGeneric));
                     if (existing != null)
                     {
                         if (existing.Planned && existing.PlanRoot != planRoot)
