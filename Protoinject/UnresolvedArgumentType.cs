@@ -9,6 +9,9 @@ namespace Protoinject
         FactoryArgument,
 
         CurrentNode,
+
+        Node,
+
         KnownValue
     }
 }

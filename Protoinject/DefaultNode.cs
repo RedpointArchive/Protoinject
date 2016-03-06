@@ -75,13 +75,7 @@ namespace Protoinject
 
         public bool Planned { get; set; }
         public string PlanName { get; set; }
-
-        public void SetTypeAndValue(Type type, object value)
-        {
-            Type = type;
-            UntypedValue = value;
-        }
-
+        
         public IPlan ParentPlan
         {
             get { return Parent; }

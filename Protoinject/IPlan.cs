@@ -19,7 +19,7 @@ namespace Protoinject
 
         List<IUnresolvedArgument> PlannedConstructorArguments { get; }
 
-        Func<IContext, object> PlannedMethod { get; set; }
+        Func<IContext, object> PlannedMethod { get; }
 
         List<IPlan> PlannedCreatedNodes { get; }
 

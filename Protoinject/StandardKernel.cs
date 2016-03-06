@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.Hosting;
 
@@ -11,7 +12,7 @@ namespace Protoinject
     {
         private Dictionary<Type, List<IMapping>> _bindings;
 
-        private IWritableHierarchy _hierarchy;
+        private IHierarchy _hierarchy;
         private IScope _singletonScope;
 
         public StandardKernel()
@@ -102,15 +103,11 @@ namespace Protoinject
             };
             if (parent == null)
             {
-                _hierarchy.RootNodes.Add(node);
+                _hierarchy.AddRootNode(node);
             }
             else
             {
-                var childrenInternal = ((DefaultNode)parent).ChildrenInternal;
-                if (!childrenInternal.Contains(node))
-                {
-                    childrenInternal.Add(node);
-                }
+                _hierarchy.AddChildNode(parent, node);
             }
             return node;
         }
@@ -129,24 +126,24 @@ namespace Protoinject
 
         #region Get / TryGet / GetAll
 
-        public T Get<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        public T Get<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
         {
-            var plan = Plan<T>(current, bindingName, planName, arguments);
+            var plan = Plan<T>(current, bindingName, planName, injectionAttributes, arguments);
             Validate(plan);
             return Resolve(plan);
         }
 
         public object Get(Type type, INode current, string bindingName, string planName,
-            params IConstructorArgument[] arguments)
+            IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
         {
-            var plan = Plan(type, current, bindingName, planName, arguments);
+            var plan = Plan(type, current, bindingName, planName, injectionAttributes, arguments);
             Validate(plan);
             return Resolve(plan);
         }
 
-        public T TryGet<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        public T TryGet<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
         {
-            var plan = Plan<T>(current, bindingName, planName, arguments);
+            var plan = Plan<T>(current, bindingName, planName, injectionAttributes, arguments);
             try
             {
                 Validate(plan);
@@ -160,9 +157,9 @@ namespace Protoinject
         }
 
         public object TryGet(Type type, INode current, string bindingName, string planName,
-            params IConstructorArgument[] arguments)
+            IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
         {
-            var plan = Plan(type, current, bindingName, planName, arguments);
+            var plan = Plan(type, current, bindingName, planName, injectionAttributes, arguments);
             try
             {
                 Validate(plan);
@@ -175,16 +172,16 @@ namespace Protoinject
             }
         }
 
-        public T[] GetAll<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        public T[] GetAll<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
         {
-            var plans = PlanAll<T>(current, bindingName, planName, arguments);
+            var plans = PlanAll<T>(current, bindingName, planName, injectionAttributes, arguments);
             ValidateAll(plans);
             return ResolveAll(plans);
         }
 
-        public object[] GetAll(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        public object[] GetAll(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
         {
-            var plans = PlanAll(type, current, bindingName, planName, arguments);
+            var plans = PlanAll(type, current, bindingName, planName, injectionAttributes, arguments);
             ValidateAll(plans);
             return ResolveAll(plans);
         }
@@ -193,24 +190,24 @@ namespace Protoinject
 
         #region Planning
 
-        public IPlan<T> Plan<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        public IPlan<T> Plan<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
         {
-            return (IPlan<T>) Plan(typeof (T), current, bindingName, planName, arguments);
+            return (IPlan<T>) Plan(typeof (T), current, bindingName, planName, injectionAttributes, arguments);
         }
 
-        public IPlan Plan(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        public IPlan Plan(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
         {
-            return CreatePlan(type, current, bindingName, planName, null, arguments);
+            return CreatePlan(type, current, bindingName, planName, null, injectionAttributes, arguments);
         }
 
-        public IPlan<T>[] PlanAll<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        public IPlan<T>[] PlanAll<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
         {
-            return (IPlan<T>[])PlanAll(typeof(T), current, bindingName, planName, arguments);
+            return (IPlan<T>[])PlanAll(typeof(T), current, bindingName, planName, injectionAttributes, arguments);
         }
 
-        public IPlan[] PlanAll(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments)
+        public IPlan[] PlanAll(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
         {
-            return CreatePlans(type, current, bindingName, planName, null, arguments);
+            return CreatePlans(type, current, bindingName, planName, null, injectionAttributes, arguments);
         }
 
         #endregion
@@ -256,7 +253,7 @@ namespace Protoinject
                                     {
                                         var target = argument.PlannedTargets[index];
 
-                                        if (!argument.IsOptional && !target.Valid)
+                                        if (!argument.InjectionParameters.OfType<OptionalAttribute>().Any() && !target.Valid)
                                         {
                                             throw new ActivationException("The planned node is not valid (hint: " + target.InvalidHint + ")", target);
                                         }
@@ -264,7 +261,7 @@ namespace Protoinject
                                 }
                                 else
                                 {
-                                    if (!argument.IsOptional && !argument.PlannedTarget.Valid)
+                                    if (!argument.InjectionParameters.OfType<OptionalAttribute>().Any() && !argument.PlannedTarget.Valid)
                                     {
                                         throw new ActivationException("The planned node is not valid (hint: " + argument.PlannedTarget.InvalidHint + ")", argument.PlannedTarget);
                                     }
@@ -337,7 +334,9 @@ namespace Protoinject
                 else if (toCreate.Planned && toCreate.PlannedMethod != null)
                 {
                     toCreate.Planned = false;
-                    toCreate.UntypedValue = toCreate.PlannedMethod(new DefaultContext(this, ((DefaultNode)node).Parent, node));
+                    _hierarchy.ChangeObjectOnNode(
+                        toCreate,
+                        toCreate.PlannedMethod(new DefaultContext(this, ((DefaultNode)node).Parent, node)));
                 }
                 else if (toCreate.Planned)
                 {
@@ -348,7 +347,9 @@ namespace Protoinject
                     }
                     try
                     {
-                        toCreate.UntypedValue = toCreate.PlannedConstructor.Invoke(parameters.ToArray());
+                        _hierarchy.ChangeObjectOnNode(
+                            toCreate,
+                            toCreate.PlannedConstructor.Invoke(parameters.ToArray()));
                     }
                     catch (TargetInvocationException ex)
                     {
@@ -410,11 +411,11 @@ namespace Protoinject
                 var parent = toCreate.ParentPlan;
                 if (parent != null)
                 {
-                    ((DefaultNode) parent)?.ChildrenInternal.Remove((INode) toCreate);
+                    _hierarchy.RemoveChildNode(parent, toCreate);
                 }
                 else
                 {
-                    _hierarchy.RootNodes.Remove(toCreate);
+                    _hierarchy.RemoveRootNode(toCreate);
                 }
                 toCreate.Parent = null;
                 toCreate.Discarded = true;
@@ -422,11 +423,11 @@ namespace Protoinject
             var nodeParent = planAsNode.ParentPlan;
             if (nodeParent != null)
             {
-                ((DefaultNode)nodeParent)?.ChildrenInternal.Remove(planAsNode);
+                _hierarchy.RemoveChildNode(nodeParent, planAsNode);
             }
             else
             {
-                _hierarchy.RootNodes.Remove(planAsNode);
+                _hierarchy.RemoveRootNode(planAsNode);
             }
         }
 
@@ -476,7 +477,7 @@ namespace Protoinject
                     {
                         if (argument.PlannedTarget.Planned)
                         {
-                            if (argument.IsOptional)
+                            if (argument.InjectionParameters.OfType<OptionalAttribute>().Any())
                             {
                                 return null;
                             }
@@ -502,9 +503,9 @@ namespace Protoinject
         }
 
         private IPlan CreatePlan(Type requestedType, INode current, string bindingName, string planName,
-            INode planRoot, IConstructorArgument[] arguments)
+            INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments)
         {
-            var plans = CreatePlans(requestedType, current, bindingName, planName, planRoot, arguments);
+            var plans = CreatePlans(requestedType, current, bindingName, planName, planRoot, injectionAttributes, arguments);
             if (plans.Length != 1)
             {
                 foreach (var plan in plans)
@@ -534,7 +535,7 @@ namespace Protoinject
             return plans[0];
         }
 
-        private IPlan[] CreatePlans(Type requestedType, INode current, string bindingName, string planName, INode planRoot, IConstructorArgument[] arguments)
+        private IPlan[] CreatePlans(Type requestedType, INode current, string bindingName, string planName, INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments)
         {
             var resolvedMappings = ResolveTypes(requestedType, bindingName, current);
             var plans = (IPlan[])Activator.CreateInstance(typeof(IPlan<>).MakeGenericType(requestedType).MakeArrayType(), resolvedMappings.Length);
@@ -551,13 +552,26 @@ namespace Protoinject
                     targetNonGeneric = targetNonGeneric.MakeGenericType(requestedType.GenericTypeArguments);
                 }
 
+                // Use the current node as the scope, unless the binding overrides the scope.
                 var scopeNode = current;
+                var uniquePerScope = resolvedMapping.UniquePerScope;
                 if (resolvedMapping.LifetimeScope != null)
                 {
                     scopeNode = resolvedMapping.LifetimeScope.GetContainingNode();
                 }
 
-                if (scopeNode != null && resolvedMapping.UniquePerScope)
+                // If the parameter or injection location has a scope attribute, that overrides
+                // the bindings default scope.
+                var scopeAttribute = injectionAttributes.OfType<ScopeAttribute>().FirstOrDefault();
+                if (scopeAttribute != null)
+                {
+                    scopeNode = scopeAttribute.ScopeFromContext(current, resolvedMapping);
+                    uniquePerScope = scopeAttribute.UniquePerScope;
+                }
+
+                // If the binding is set to be unique per scope, find an existing plan for
+                // this binding in the current scope if one exists.
+                if (scopeNode != null && uniquePerScope)
                 {
                     var existing =
                         scopeNode.Children.FirstOrDefault(x => x.Type != null && x.Type.IsAssignableFrom(targetNonGeneric));
@@ -717,12 +731,17 @@ namespace Protoinject
                         var parameter = parameters[ii];
 
                         var plannedArgument = new DefaultUnresolvedArgument();
-                        plannedArgument.ParameterName = parameter.Name;
+                        //plannedArgument.ParameterName = parameter.Name;
 
                         if (parameter.ParameterType == typeof (ICurrentNode))
                         {
                             plannedArgument.ArgumentType = UnresolvedArgumentType.CurrentNode;
                             plannedArgument.CurrentNode = new DefaultCurrentNode(createdNode);
+                        }
+                        else if (parameter.ParameterType == typeof(INode))
+                        {
+                            plannedArgument.ArgumentType = UnresolvedArgumentType.Node;
+                            plannedArgument.Node = createdNode;
                         }
                         else if (parameter.ParameterType == typeof (IKernel))
                         {
@@ -733,8 +752,10 @@ namespace Protoinject
                         {
                             plannedArgument.ArgumentType = UnresolvedArgumentType.Type;
                             plannedArgument.UnresolvedType = parameters[ii].ParameterType;
-                            plannedArgument.ParameterName = parameters[ii].GetCustomAttribute<NamedAttribute>()?.Name;
-                            plannedArgument.IsOptional = parameters[ii].GetCustomAttribute<OptionalAttribute>() != null;
+                            plannedArgument.InjectionParameters =
+                                parameters[ii].GetCustomAttributes(true).OfType<IInjectionAttribute>().ToArray();
+                            //plannedArgument.ParameterName = parameters[ii].GetCustomAttribute<NamedAttribute>()?.Name;
+                            //plannedArgument.IsOptional = parameters[ii].GetCustomAttribute<OptionalAttribute>() != null;
                         }
 
                         slots[ii] = plannedArgument;
@@ -752,18 +773,16 @@ namespace Protoinject
                                     var children = CreatePlans(
                                         argument.MultipleResultElementType,
                                         createdNode,
-                                        argument.ParameterName,
+                                        argument.InjectionParameters.OfType<NamedAttribute>().FirstOrDefault()?.Name,
                                         planName,
                                         planRoot,
+                                        argument.InjectionParameters,
                                         null);
                                     foreach (var child in children)
                                     {
                                         if (child.ParentPlan == createdNode)
                                         {
-                                            if (!createdNode.ChildrenInternal.Contains((INode)child))
-                                            {
-                                                createdNode.ChildrenInternal.Add((INode)child);
-                                            }
+                                            _hierarchy.AddChildNode(createdNode, (INode)child);
                                         }
                                     }
                                     ((DefaultUnresolvedArgument)argument).PlannedTargets = children;
@@ -773,16 +792,14 @@ namespace Protoinject
                                     var child = CreatePlan(
                                         argument.UnresolvedType,
                                         createdNode,
-                                        argument.ParameterName,
+                                        argument.InjectionParameters.OfType<NamedAttribute>().FirstOrDefault()?.Name,
                                         planName,
                                         planRoot,
+                                        argument.InjectionParameters,
                                         null);
                                     if (child.ParentPlan == createdNode)
                                     {
-                                        if (!createdNode.ChildrenInternal.Contains((INode)child))
-                                        {
-                                            createdNode.ChildrenInternal.Add((INode)child);
-                                        }
+                                        _hierarchy.AddChildNode(createdNode, (INode)child);
                                     }
                                     ((DefaultUnresolvedArgument)argument).PlannedTarget = child;
                                 }
@@ -793,15 +810,11 @@ namespace Protoinject
 
                     if (createdNode.Parent == null)
                     {
-                        _hierarchy.RootNodes.Add(createdNode);
+                        _hierarchy.AddRootNode(createdNode);
                     }
                     else
                     {
-                        var childrenInternal = ((DefaultNode)scopeNode).ChildrenInternal;
-                        if (!childrenInternal.Contains(createdNode))
-                        {
-                            childrenInternal.Add(createdNode);
-                        }
+                        _hierarchy.AddChildNode(scopeNode, createdNode);
                     }
 
                     plans[i] = createdNode;

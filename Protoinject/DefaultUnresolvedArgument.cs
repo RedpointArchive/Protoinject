@@ -15,8 +15,9 @@ namespace Protoinject
         public Delegate FactoryDelegate { get; set; }
         public IPlan PlannedTarget { get; set; }
         public IPlan[] PlannedTargets { get; set; }
-        public string ParameterName { get; set; }
         public object KnownValue { get; set; }
+        public IInjectionAttribute[] InjectionParameters { get; set; }
+        public INode Node { get; set; }
 
         public bool IsMultipleResult
         {
@@ -44,7 +45,5 @@ namespace Protoinject
                 throw new NotSupportedException();
             }
         }
-
-        public bool IsOptional { get; set; }
     }
 }

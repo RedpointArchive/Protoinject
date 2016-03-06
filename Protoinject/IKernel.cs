@@ -17,17 +17,17 @@ namespace Protoinject
         void Load<T>() where T : IProtoinjectModule;
         void Load(IProtoinjectModule module);
         
-        T Get<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
-        object Get(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
-        T TryGet<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
-        object TryGet(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
-        T[] GetAll<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
-        object[] GetAll(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
+        T Get<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments);
+        object Get(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments);
+        T TryGet<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments);
+        object TryGet(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments);
+        T[] GetAll<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments);
+        object[] GetAll(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments);
 
-        IPlan<T> Plan<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
-        IPlan Plan(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
-        IPlan<T>[] PlanAll<T>(INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
-        IPlan[] PlanAll(Type type, INode current, string bindingName, string planName, params IConstructorArgument[] arguments);
+        IPlan<T> Plan<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments);
+        IPlan Plan(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments);
+        IPlan<T>[] PlanAll<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments);
+        IPlan[] PlanAll(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments);
         void Validate<T>(IPlan<T> plan);
         void Validate(IPlan plan);
         void ValidateAll<T>(IPlan<T>[] plans);

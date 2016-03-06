@@ -101,12 +101,13 @@ namespace Protoinject.FactoryGenerator
                 assembly.MainModule.Import(iCurrentNodeDef.GetMethods().First(x => x.Name == "GetNodeForFactoryImplementation"));
             var getTypeFromHandle = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "System.Type").GetMethods().First(x => x.Name == "GetTypeFromHandle"));
             var iConstructorArgument = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.IConstructorArgument"));
+            var iInjectionAttribute = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.IInjectionAttribute"));
             var namedConstructorArgumentConstructor = assembly.MainModule.Import(
                 FindTypeInModuleOrReferences(assembly, "Protoinject.NamedConstructorArgument")
                 .GetConstructors().First());
             var kernelGet = assembly.MainModule.Import(iKernelDef.GetMethods().First(x => 
                 x.Name == "Get" &&
-                x.Parameters.Count == 5 &&
+                x.Parameters.Count == 6 &&
                 x.Parameters[0].ParameterType.Name == "Type" &&
                 x.Parameters[1].ParameterType.Name == "INode" &&
                 x.Parameters[2].ParameterType.Name == "String" &&
@@ -222,6 +223,8 @@ namespace Protoinject.FactoryGenerator
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldfld, currentField));
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldnull));
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldnull));
+                    impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4, 0));
+                    impl.Body.Instructions.Add(Instruction.Create(OpCodes.Newarr, iInjectionAttribute));
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4, method.Parameters.Count));
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Newarr, iConstructorArgument));
 

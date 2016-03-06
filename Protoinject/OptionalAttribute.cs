@@ -3,7 +3,7 @@
     using System;
 
     [AttributeUsage(AttributeTargets.Parameter)]
-    public class OptionalAttribute : Attribute
+    public class OptionalAttribute : Attribute, IInjectionAttribute
     {
     }
 }

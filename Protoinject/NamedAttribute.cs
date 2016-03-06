@@ -3,7 +3,7 @@
     using System;
 
     [AttributeUsage(AttributeTargets.Parameter)]
-    public class NamedAttribute : Attribute
+    public class NamedAttribute : Attribute, IInjectionAttribute
     {
         public NamedAttribute(string name)
         {

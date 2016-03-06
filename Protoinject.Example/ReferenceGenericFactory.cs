@@ -28,7 +28,8 @@ namespace Protoinject.Example
                 typeof(IGeneric<T1, T2>),
                 _node,
                 null,
-                null);
+                null,
+                new IInjectionAttribute[0]);
         }
     }
 }

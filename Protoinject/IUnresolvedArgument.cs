@@ -13,10 +13,10 @@ namespace Protoinject
         Delegate FactoryDelegate { get; }
         IPlan PlannedTarget { get; }
         IPlan[] PlannedTargets { get; }
-        string ParameterName { get; }
         object KnownValue { get; }
         bool IsMultipleResult { get; }
         Type MultipleResultElementType { get; }
-        bool IsOptional { get; }
+        IInjectionAttribute[] InjectionParameters { get; }
+        INode Node { get; }
     }
 }

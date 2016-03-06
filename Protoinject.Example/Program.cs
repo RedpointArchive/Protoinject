@@ -38,8 +38,8 @@ namespace Protoinject.Example
             kernel.Bind<IWorld>().To<DefaultWorld>();
             kernel.Bind<IPlayer>().To<Player>();
 
-            var worldPlan = kernel.Plan<IWorld>(null, null, "world1");
-            var worldPlan2 = kernel.Plan<IWorld>(null, null, "world2");
+            var worldPlan = kernel.Plan<IWorld>(null, null, "world1", new IInjectionAttribute[0]);
+            var worldPlan2 = kernel.Plan<IWorld>(null, null, "world2", new IInjectionAttribute[0]);
             //kernel.Validate(worldPlan);
             //var world = kernel.Resolve(worldPlan);
 
