@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.Hosting;
+using System.Runtime.Serialization;
 
 namespace Protoinject
 {
@@ -351,9 +352,13 @@ namespace Protoinject
                     }
                     try
                     {
-                        _hierarchy.ChangeObjectOnNode(
-                            toCreate,
-                            toCreate.PlannedConstructor.Invoke(parameters.ToArray()));
+                        // Create the uninitialized object so that node lookups work before the constructors
+                        // have finished being called.
+                        toCreate.UntypedValue = FormatterServices.GetUninitializedObject(toCreate.Type);
+
+                        _hierarchy.ChangeObjectOnNode(toCreate, toCreate.UntypedValue);
+
+                        toCreate.PlannedConstructor.Invoke(toCreate.UntypedValue, parameters.ToArray());
                     }
                     catch (TargetInvocationException ex)
                     {
