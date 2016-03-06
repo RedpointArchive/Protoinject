@@ -13,12 +13,16 @@ namespace Protoinject
         private Dictionary<Type, List<IMapping>> _bindings;
 
         private IHierarchy _hierarchy;
+
         private IScope _singletonScope;
+
+        private Dictionary<Assembly, Type[]> _assemblyTypeCache;
 
         public StandardKernel()
         {
             _bindings = new Dictionary<Type, List<IMapping>>();
             _hierarchy = new DefaultHierarchy();
+            _assemblyTypeCache = new Dictionary<Assembly, Type[]>();
         }
 
         public IHierarchy Hierarchy => _hierarchy;
@@ -642,8 +646,7 @@ namespace Protoinject
                             continue;
                         }
 
-                        var resolvedFactoryClass =
-                            createdNode.Type.Assembly.GetTypes()
+                        var resolvedFactoryClass = GetTypesForAssembly(createdNode.Type.Assembly)
                                 .FirstOrDefault(x => x.FullName == attribute.FullTypeName);
                         if (resolvedFactoryClass == null)
                         {
@@ -826,6 +829,17 @@ namespace Protoinject
             }
 
             return plans;
+        }
+
+        private Type[] GetTypesForAssembly(Assembly assembly)
+        {
+            if (_assemblyTypeCache.ContainsKey(assembly))
+            {
+                return _assemblyTypeCache[assembly];
+            }
+
+            _assemblyTypeCache[assembly] = assembly.GetTypes();
+            return _assemblyTypeCache[assembly];
         }
 
         private IMapping[] ResolveTypes(Type originalType, string name, INode current)

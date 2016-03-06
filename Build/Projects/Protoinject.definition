@@ -16,6 +16,7 @@
     <Compile Include="DefaultUnresolvedArgument.cs" />
     <Compile Include="FixedScope.cs" />
     <Compile Include="GeneratedFactoryAttribute.cs" />
+    <Compile Include="GetScopeFromContext.cs" />
     <Compile Include="IBindInScope.cs" />
     <Compile Include="IBindInScopeOrUnique.cs" />
     <Compile Include="IBindInScopeWithDescendantFilterOrUnique.cs" />
@@ -29,6 +30,7 @@
     <Compile Include="ICurrentNode.cs" />
     <Compile Include="IGenerateFactory.cs" />
     <Compile Include="IHierarchy.cs" />
+    <Compile Include="IInjectionAttribute.cs" />
     <Compile Include="IKernel.cs" />
     <Compile Include="IMapping.cs" />
     <Compile Include="INode.cs" />
@@ -45,6 +47,7 @@
     <Compile Include="Resources\Resource.Designer.cs">
       <Platforms>Android,Ouya</Platforms>
     </Compile>
+    <Compile Include="ScopeAttribute.cs" />
     <Compile Include="StandardKernel.cs" />
     <Compile Include="UnresolvedArgumentType.cs" />
   </Files>
