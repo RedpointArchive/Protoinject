@@ -12,6 +12,8 @@ namespace Protoinject
 
         Node,
 
-        KnownValue
+        KnownValue,
+
+        Hierarchy
     }
 }

@@ -19,5 +19,6 @@ namespace Protoinject
         IInjectionAttribute[] InjectionParameters { get; }
         INode Node { get; }
         string Name { get; set; }
+        IHierarchy Hierarchy { get; }
     }
 }

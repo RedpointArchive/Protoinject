@@ -499,6 +499,10 @@ namespace Protoinject
                     return argument.FactoryArgumentValue;
                 case UnresolvedArgumentType.CurrentNode:
                     return argument.CurrentNode;
+                case UnresolvedArgumentType.Node:
+                    return argument.Node;
+                case UnresolvedArgumentType.Hierarchy:
+                    return argument.Hierarchy;
                 case UnresolvedArgumentType.KnownValue:
                     return argument.KnownValue;
             }
@@ -745,6 +749,11 @@ namespace Protoinject
                         {
                             plannedArgument.ArgumentType = UnresolvedArgumentType.Node;
                             plannedArgument.Node = createdNode;
+                        }
+                        else if (parameter.ParameterType == typeof(IHierarchy))
+                        {
+                            plannedArgument.ArgumentType = UnresolvedArgumentType.Hierarchy;
+                            plannedArgument.Hierarchy = _hierarchy;
                         }
                         else if (parameter.ParameterType == typeof (IKernel))
                         {

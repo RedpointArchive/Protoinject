@@ -19,6 +19,7 @@ namespace Protoinject
         public IInjectionAttribute[] InjectionParameters { get; set; }
         public INode Node { get; set; }
         public string Name { get; set; }
+        public IHierarchy Hierarchy { get; set; }
 
         public bool IsMultipleResult
         {
