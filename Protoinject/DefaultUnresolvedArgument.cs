@@ -18,6 +18,7 @@ namespace Protoinject
         public object KnownValue { get; set; }
         public IInjectionAttribute[] InjectionParameters { get; set; }
         public INode Node { get; set; }
+        public string Name { get; set; }
 
         public bool IsMultipleResult
         {

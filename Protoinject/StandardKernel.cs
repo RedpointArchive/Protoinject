@@ -757,8 +757,8 @@ namespace Protoinject
                             plannedArgument.UnresolvedType = parameters[ii].ParameterType;
                             plannedArgument.InjectionParameters =
                                 parameters[ii].GetCustomAttributes(true).OfType<IInjectionAttribute>().ToArray();
-                            //plannedArgument.ParameterName = parameters[ii].GetCustomAttribute<NamedAttribute>()?.Name;
-                            //plannedArgument.IsOptional = parameters[ii].GetCustomAttribute<OptionalAttribute>() != null;
+                            plannedArgument.Name =
+                                plannedArgument.InjectionParameters.OfType<NamedAttribute>().FirstOrDefault()?.Name;
                         }
 
                         slots[ii] = plannedArgument;
@@ -776,7 +776,7 @@ namespace Protoinject
                                     var children = CreatePlans(
                                         argument.MultipleResultElementType,
                                         createdNode,
-                                        argument.InjectionParameters.OfType<NamedAttribute>().FirstOrDefault()?.Name,
+                                        argument.Name,
                                         planName,
                                         planRoot,
                                         argument.InjectionParameters,
@@ -795,7 +795,7 @@ namespace Protoinject
                                     var child = CreatePlan(
                                         argument.UnresolvedType,
                                         createdNode,
-                                        argument.InjectionParameters.OfType<NamedAttribute>().FirstOrDefault()?.Name,
+                                        argument.Name,
                                         planName,
                                         planRoot,
                                         argument.InjectionParameters,

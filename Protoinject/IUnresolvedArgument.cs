@@ -18,5 +18,6 @@ namespace Protoinject
         Type MultipleResultElementType { get; }
         IInjectionAttribute[] InjectionParameters { get; }
         INode Node { get; }
+        string Name { get; set; }
     }
 }

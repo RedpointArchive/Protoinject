@@ -55,7 +55,7 @@ namespace Protoinject
             {
                 return string.Empty;
             }
-            var me = (indent + "- " + current.InjectionParameters.OfType<NamedAttribute>().FirstOrDefault()?.Name).TrimEnd();
+            var me = (indent + "- " + current.Name).TrimEnd();
             me += " (" + current.ArgumentType + ")";
             if (current.UnresolvedType != null)
             {
