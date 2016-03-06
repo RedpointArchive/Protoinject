@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Protoinject
@@ -55,6 +56,15 @@ namespace Protoinject
 
         public void ChangeObjectOnNode(INode node, object newValue)
         {
+            if (((DefaultNode) node).Type == null)
+            {
+                throw new InvalidOperationException("You can't change the object on this node, because no type has been assigned to this node.");
+            }
+            if (((DefaultNode) node).Type.IsInstanceOfType(newValue))
+            {
+                throw new InvalidOperationException("The passed value needs to be an instance of or derive from " + ((DefaultNode)node).Type.FullName + ", but it does not.");
+            }
+
             RemoveNodeFromLookup(node);
             ((DefaultNode)node).UntypedValue = newValue;
             AddNodeToLookup(node);
@@ -62,9 +72,15 @@ namespace Protoinject
 
         public INode CreateNodeForObject(object obj)
         {
+            if (obj == null)
+            {
+                throw new ArgumentNullException(nameof(obj));
+            }
+
             return new DefaultNode
             {
                 UntypedValue = obj,
+                Type = obj.GetType(),
                 Discarded = false,
             };
         }
