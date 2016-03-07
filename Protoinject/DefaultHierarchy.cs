@@ -54,13 +54,25 @@ namespace Protoinject
             RemoveNodeFromLookup(child);
         }
 
+        public void RemoveNode(INode node)
+        {
+            if (_rootNodes.Contains(node))
+            {
+                RemoveRootNode(node);
+            }
+            else if (node.Parent != null)
+            {
+                RemoveChildNode(node.Parent, node);
+            }
+        }
+
         public void ChangeObjectOnNode(INode node, object newValue)
         {
             if (((DefaultNode) node).Type == null)
             {
                 throw new InvalidOperationException("You can't change the object on this node, because no type has been assigned to this node.");
             }
-            if (((DefaultNode) node).Type.IsInstanceOfType(newValue))
+            if (!((DefaultNode) node).Type.IsInstanceOfType(newValue))
             {
                 throw new InvalidOperationException("The passed value needs to be an instance of or derive from " + ((DefaultNode)node).Type.FullName + ", but it does not.");
             }

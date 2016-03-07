@@ -16,6 +16,8 @@ namespace Protoinject
 
         void RemoveChildNode(IPlan parent, INode child);
 
+        void RemoveNode(INode node);
+
         void ChangeObjectOnNode(INode node, object newValue);
 
         INode CreateNodeForObject(object obj);
