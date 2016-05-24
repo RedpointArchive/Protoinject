@@ -36,6 +36,7 @@
     <Compile Include="Resources\Resource.Designer.cs">
       <Platforms>Android,Ouya</Platforms>
     </Compile>
+    <Compile Include="TransientBindingsTests.cs" />
     <Content Include="Properties\AndroidManifest.xml">
       <Platforms>Android,Ouya</Platforms>
     </Content>

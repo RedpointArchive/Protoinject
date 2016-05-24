@@ -28,7 +28,9 @@ namespace Protoinject.Example
                 null,
                 null,
                 new IInjectionAttribute[0],
-                new NamedConstructorArgument("name", name));
+                new NamedConstructorArgument("name", name),
+                null,
+                null);
         }
 
         public INetworkingPlayer CreateNetworkingPlayer()
@@ -38,7 +40,9 @@ namespace Protoinject.Example
                 _node,
                 null,
                 null,
-                new IInjectionAttribute[0]);
+                new IInjectionAttribute[0],
+                null,
+                null);
         }
     }
 }

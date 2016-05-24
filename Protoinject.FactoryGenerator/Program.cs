@@ -107,7 +107,7 @@ namespace Protoinject.FactoryGenerator
                 .GetConstructors().First());
             var kernelGet = assembly.MainModule.Import(iKernelDef.GetMethods().First(x => 
                 x.Name == "Get" &&
-                x.Parameters.Count == 6 &&
+                x.Parameters.Count == 7 &&
                 x.Parameters[0].ParameterType.Name == "Type" &&
                 x.Parameters[1].ParameterType.Name == "INode" &&
                 x.Parameters[2].ParameterType.Name == "String" &&
@@ -243,6 +243,8 @@ namespace Protoinject.FactoryGenerator
                         impl.Body.Instructions.Add(Instruction.Create(OpCodes.Stelem_Ref));
                         i++;
                     }
+                    
+                    impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldnull));
 
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Callvirt, kernelGet));
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Castclass, method.ReturnType));

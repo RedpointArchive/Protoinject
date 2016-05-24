@@ -131,24 +131,26 @@ namespace Protoinject
 
         #region Get / TryGet / GetAll
 
-        public T Get<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
+        public T Get<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
         {
-            var plan = Plan<T>(current, bindingName, planName, injectionAttributes, arguments);
+            var plan = Plan<T>(current, bindingName, planName, injectionAttributes, arguments, transientBindings);
             Validate(plan);
             return Resolve(plan);
         }
 
         public object Get(Type type, INode current, string bindingName, string planName,
-            IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
+            IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments,
+            Dictionary<Type, List<IMapping>> transientBindings)
         {
-            var plan = Plan(type, current, bindingName, planName, injectionAttributes, arguments);
+            var plan = Plan(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings);
             Validate(plan);
             return Resolve(plan);
         }
 
-        public T TryGet<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
+        public T TryGet<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments,
+            Dictionary<Type, List<IMapping>> transientBindings)
         {
-            var plan = Plan<T>(current, bindingName, planName, injectionAttributes, arguments);
+            var plan = Plan<T>(current, bindingName, planName, injectionAttributes, arguments, transientBindings);
             try
             {
                 Validate(plan);
@@ -162,9 +164,10 @@ namespace Protoinject
         }
 
         public object TryGet(Type type, INode current, string bindingName, string planName,
-            IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
+            IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments,
+            Dictionary<Type, List<IMapping>> transientBindings)
         {
-            var plan = Plan(type, current, bindingName, planName, injectionAttributes, arguments);
+            var plan = Plan(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings);
             try
             {
                 Validate(plan);
@@ -177,16 +180,16 @@ namespace Protoinject
             }
         }
 
-        public T[] GetAll<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
+        public T[] GetAll<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
         {
-            var plans = PlanAll<T>(current, bindingName, planName, injectionAttributes, arguments);
+            var plans = PlanAll<T>(current, bindingName, planName, injectionAttributes, arguments, transientBindings);
             ValidateAll(plans);
             return ResolveAll(plans);
         }
 
-        public object[] GetAll(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
+        public object[] GetAll(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
         {
-            var plans = PlanAll(type, current, bindingName, planName, injectionAttributes, arguments);
+            var plans = PlanAll(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings);
             ValidateAll(plans);
             return ResolveAll(plans);
         }
@@ -195,24 +198,24 @@ namespace Protoinject
 
         #region Planning
 
-        public IPlan<T> Plan<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
+        public IPlan<T> Plan<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
         {
-            return (IPlan<T>) Plan(typeof (T), current, bindingName, planName, injectionAttributes, arguments);
+            return (IPlan<T>) Plan(typeof (T), current, bindingName, planName, injectionAttributes, arguments, transientBindings);
         }
 
-        public IPlan Plan(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
+        public IPlan Plan(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
         {
-            return CreatePlan(type, current, bindingName, planName, null, injectionAttributes, arguments);
+            return CreatePlan(type, current, bindingName, planName, null, injectionAttributes, arguments, transientBindings);
         }
 
-        public IPlan<T>[] PlanAll<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
+        public IPlan<T>[] PlanAll<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
         {
-            return (IPlan<T>[])PlanAll(typeof(T), current, bindingName, planName, injectionAttributes, arguments);
+            return (IPlan<T>[])PlanAll(typeof(T), current, bindingName, planName, injectionAttributes, arguments, transientBindings);
         }
 
-        public IPlan[] PlanAll(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
+        public IPlan[] PlanAll(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
         {
-            return CreatePlans(type, current, bindingName, planName, null, injectionAttributes, arguments);
+            return CreatePlans(type, current, bindingName, planName, null, injectionAttributes, arguments, transientBindings);
         }
 
         #endregion
@@ -516,9 +519,10 @@ namespace Protoinject
         }
 
         private IPlan CreatePlan(Type requestedType, INode current, string bindingName, string planName,
-            INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments)
+            INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments,
+            Dictionary<Type, List<IMapping>> transientBindings)
         {
-            var plans = CreatePlans(requestedType, current, bindingName, planName, planRoot, injectionAttributes, arguments);
+            var plans = CreatePlans(requestedType, current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings);
             if (plans.Length != 1)
             {
                 foreach (var plan in plans)
@@ -548,10 +552,21 @@ namespace Protoinject
             return plans[0];
         }
 
-        private IPlan[] CreatePlans(Type requestedType, INode current, string bindingName, string planName, INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments)
+        private IPlan[] CreatePlans(
+            Type requestedType, 
+            INode current, 
+            string bindingName, 
+            string planName, 
+            INode planRoot, 
+            IInjectionAttribute[] injectionAttributes, 
+            IConstructorArgument[] arguments,
+            Dictionary<Type, List<IMapping>> transientBindings)
         {
-            var resolvedMappings = ResolveTypes(requestedType, bindingName, current);
+            var resolvedMappings = ResolveTypes(requestedType, bindingName, current, transientBindings);
             var plans = (IPlan[])Activator.CreateInstance(typeof(IPlan<>).MakeGenericType(requestedType).MakeArrayType(), resolvedMappings.Length);
+
+            injectionAttributes = injectionAttributes ?? new IInjectionAttribute[0];
+            arguments = arguments ?? new IConstructorArgument[0];
 
             for (var i = 0; i < resolvedMappings.Length; i++)
             {
@@ -794,7 +809,8 @@ namespace Protoinject
                                         planName,
                                         planRoot,
                                         argument.InjectionParameters,
-                                        null);
+                                        null,
+                                        transientBindings);
                                     foreach (var child in children)
                                     {
                                         if (child.ParentPlan == createdNode)
@@ -813,7 +829,8 @@ namespace Protoinject
                                         planName,
                                         planRoot,
                                         argument.InjectionParameters,
-                                        null);
+                                        null,
+                                        transientBindings);
                                     if (child.ParentPlan == createdNode)
                                     {
                                         _hierarchy.AddChildNode(createdNode, (INode)child);
@@ -856,12 +873,31 @@ namespace Protoinject
             return _assemblyTypeCache[assembly];
         }
 
-        private IMapping[] ResolveTypes(Type originalType, string name, INode current)
+        private IMapping[] ResolveTypes(Type originalType, string name, INode current, Dictionary<Type, List<IMapping>> transientBindings)
         {
             var mappings = new List<IMapping>();
 
             // Try to resolve the type using bindings first.
-            if (_bindings.ContainsKey(originalType))
+            if (transientBindings != null && transientBindings.ContainsKey(originalType))
+            {
+                var bindings = transientBindings[originalType];
+                var sortedBindings = bindings.Where(x => x.Named == name)
+                    .OrderBy(x => x.OnlyUnderDescendantFilter != null ? 0 : 1);
+                foreach (var b in sortedBindings)
+                {
+                    if (b.OnlyUnderDescendantFilter != null)
+                    {
+                        var parents = b.OnlyUnderDescendantFilter.GetParents();
+                        if (!parents.Contains(current))
+                        {
+                            continue;
+                        }
+                    }
+
+                    mappings.Add(b);
+                }
+            }
+            else if (_bindings.ContainsKey(originalType))
             {
                 var bindings = _bindings[originalType];
                 var sortedBindings = bindings.Where(x => x.Named == name)
@@ -883,7 +919,28 @@ namespace Protoinject
 
             if (mappings.Count == 0)
             {
-                if (originalType.IsGenericType && _bindings.ContainsKey(originalType.GetGenericTypeDefinition()))
+                if (transientBindings != null && originalType.IsGenericType && transientBindings.ContainsKey(originalType.GetGenericTypeDefinition()))
+                {
+                    // Try the original generic type definition to see if we
+                    // need to pass generic parameters through.
+                    var bindings = transientBindings[originalType.GetGenericTypeDefinition()];
+                    var sortedBindings = bindings.Where(x => x.Named == name)
+                        .OrderBy(x => x.OnlyUnderDescendantFilter != null ? 0 : 1);
+                    foreach (var b in sortedBindings)
+                    {
+                        if (b.OnlyUnderDescendantFilter != null)
+                        {
+                            var parents = b.OnlyUnderDescendantFilter.GetParents();
+                            if (!parents.Contains(current))
+                            {
+                                continue;
+                            }
+                        }
+
+                        mappings.Add(b);
+                    }
+                }
+                else if (originalType.IsGenericType && _bindings.ContainsKey(originalType.GetGenericTypeDefinition()))
                 {
                     // Try the original generic type definition to see if we
                     // need to pass generic parameters through.
