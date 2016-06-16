@@ -24,13 +24,27 @@ namespace Protoinject
             }
             if (current.Planned)
             {
-                if (!string.IsNullOrWhiteSpace(current.PlanName))
+                if (current.Deferred)
                 {
-                    me += " **PLANNED (as '" + current.PlanName + "')**";
+                    if (!string.IsNullOrWhiteSpace(current.PlanName))
+                    {
+                        me += " **DEFERRED (as '" + current.PlanName + "')**";
+                    }
+                    else
+                    {
+                        me += " **DEFERRED**";
+                    }
                 }
                 else
                 {
-                    me += " **PLANNED**";
+                    if (!string.IsNullOrWhiteSpace(current.PlanName))
+                    {
+                        me += " **PLANNED (as '" + current.PlanName + "')**";
+                    }
+                    else
+                    {
+                        me += " **PLANNED**";
+                    }
                 }
             }
             me += Environment.NewLine;

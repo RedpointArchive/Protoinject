@@ -9,6 +9,12 @@ namespace Protoinject
     {
         bool Planned { get; }
 
+        bool Deferred { get; }
+
+        IReadOnlyCollection<KeyValuePair<Type, INode>> DeferredSearchOptions { get; }
+
+        INode DeferredResolvedTarget { get; }
+
         string PlanName { get; }
 
         IPlan ParentPlan { get; }
@@ -23,6 +29,8 @@ namespace Protoinject
 
         List<IPlan> PlannedCreatedNodes { get; }
 
+        List<IPlan> DeferredCreatedNodes { get; }
+
         string FullName { get; }
 
         IPlan PlanRoot { get; }
@@ -34,6 +42,8 @@ namespace Protoinject
         bool Valid { get; }
 
         string InvalidHint { get; }
+
+        Type RequestedType { get; }
     }
 
     public interface IPlan<out T> : IPlan

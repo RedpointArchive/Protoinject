@@ -44,6 +44,7 @@
     <Compile Include="NodeExtensions.cs" />
     <Compile Include="OptionalAttribute.cs" />
     <Compile Include="ProtoinjectModule.cs" />
+    <Compile Include="RequireExistingAttribute.cs" />
     <Compile Include="Resources\Resource.Designer.cs">
       <Platforms>Android,Ouya</Platforms>
     </Compile>

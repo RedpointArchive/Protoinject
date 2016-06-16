@@ -16,6 +16,8 @@ namespace Protoinject
         {
             ChildrenInternal = new List<INode>();
             PlannedCreatedNodes = new List<IPlan>();
+            DeferredCreatedNodes = new List<IPlan>();
+            DeferredSearchOptions = new Dictionary<Type, INode>();
             DependentOnPlans = new List<IPlan>();
         }
 
@@ -27,6 +29,7 @@ namespace Protoinject
         public IReadOnlyCollection<INode> Children => ChildrenInternal.AsReadOnly();
 
         public List<IPlan> PlannedCreatedNodes { get; }
+        public List<IPlan> DeferredCreatedNodes { get; }
 
         public string FullName
         {
@@ -50,7 +53,7 @@ namespace Protoinject
             {
                 if (this.Planned)
                 {
-                    return UntypedValue != null || PlannedConstructor != null || PlannedMethod != null;
+                    return UntypedValue != null || PlannedConstructor != null || PlannedMethod != null || (Deferred && DeferredResolvedTarget != null);
                 }
 
                 return !Discarded;
@@ -74,6 +77,7 @@ namespace Protoinject
         }
 
         public bool Planned { get; set; }
+        
         public string PlanName { get; set; }
         
         public IPlan ParentPlan
@@ -87,6 +91,11 @@ namespace Protoinject
         public List<IUnresolvedArgument> PlannedConstructorArguments { get; set; }
         public string InvalidHint { get; set; }
         public Func<IContext, object> PlannedMethod { get; set; }
+
+        public bool Deferred { get; set; }
+        public IReadOnlyCollection<KeyValuePair<Type, INode>> DeferredSearchOptions { get; set; }
+        public INode DeferredResolvedTarget { get; set; }
+        public Type RequestedType { get; set; }
 
         public static string NormalizeName(string name)
         {

@@ -261,18 +261,12 @@ namespace Protoinject
                                     {
                                         var target = argument.PlannedTargets[index];
 
-                                        if (!argument.InjectionParameters.OfType<OptionalAttribute>().Any() && !target.Valid)
-                                        {
-                                            throw new ActivationException("The planned node is not valid (hint: " + target.InvalidHint + ")", target);
-                                        }
+                                        ValidateArgument(argument, target);
                                     }
                                 }
                                 else
                                 {
-                                    if (!argument.InjectionParameters.OfType<OptionalAttribute>().Any() && !argument.PlannedTarget.Valid)
-                                    {
-                                        throw new ActivationException("The planned node is not valid (hint: " + argument.PlannedTarget.InvalidHint + ")", argument.PlannedTarget);
-                                    }
+                                    ValidateArgument(argument, argument.PlannedTarget);
                                 }
                                 break;
                         }
@@ -281,6 +275,21 @@ namespace Protoinject
             }
 
             // TODO: Validate more configuration
+        }
+
+        private void ValidateArgument(IUnresolvedArgument argument, IPlan target)
+        {
+            if (argument.InjectionParameters.OfType<OptionalAttribute>().Any())
+            {
+                // Optional arguments are always valid, because the result will
+                // simply be null when injected.
+                return;
+            }
+
+            if (!target.Valid)
+            {
+                throw new ActivationException("The planned node is not valid (hint: " + target.InvalidHint + ")", target);
+            }
         }
 
         public void ValidateAll<T>(IPlan<T>[] plans)
@@ -315,19 +324,19 @@ namespace Protoinject
                 return (INode)plan;
             }
 
-            foreach (var dependant in plan.DependentOnPlans)
+            foreach (var dependent in plan.DependentOnPlans)
             {
-                if (dependant.Discarded)
+                if (dependent.Discarded)
                 {
-                    throw new ActivationException("This plan was dependant on plan '" + dependant.FullName + "' / '" +
-                                                  dependant.PlanName +
+                    throw new ActivationException("This plan was dependent on plan '" + dependent.FullName + "' / '" +
+                                                  dependent.PlanName +
                                                   "', but that plan has since been discarded.  Re-create this plan to resolve it.",
                         plan);
                 }
-                else if (dependant.Planned)
+                else if (dependent.Planned)
                 {
-                    throw new ActivationException("This plan is dependant on plan '" + dependant.FullName + "' / '" +
-                                                  dependant.PlanName + "', but that plan is not resolved yet.", plan);
+                    throw new ActivationException("This plan is dependent on plan '" + dependent.FullName + "' / '" +
+                                                  dependent.PlanName + "', but that plan is not resolved yet.", plan);
                 }
             }
 
@@ -345,6 +354,13 @@ namespace Protoinject
                     _hierarchy.ChangeObjectOnNode(
                         toCreate,
                         toCreate.PlannedMethod(new DefaultContext(this, ((DefaultNode)node).Parent, node)));
+                }
+                else if (toCreate.Planned && toCreate.Deferred)
+                {
+                    // Remove this deferred node from the tree, because the
+                    // resolved target node will be used by ResolveArgument
+                    // to provide any parameter values as needed.
+                    _hierarchy.RemoveNode(toCreate);
                 }
                 else if (toCreate.Planned)
                 {
@@ -475,6 +491,11 @@ namespace Protoinject
                         {
                             var target = argument.PlannedTargets[index];
 
+                            while (target.Deferred && target.DeferredResolvedTarget != null)
+                            {
+                                target = target.DeferredResolvedTarget;
+                            }
+
                             if (target.Planned)
                             {
                                 throw new ActivationException(
@@ -487,7 +508,14 @@ namespace Protoinject
                     }
                     else
                     {
-                        if (argument.PlannedTarget.Planned)
+                        var target = argument.PlannedTarget;
+
+                        while (target.Deferred && target.DeferredResolvedTarget != null)
+                        {
+                            target = target.DeferredResolvedTarget;
+                        }
+
+                        if (target.Planned)
                         {
                             if (argument.InjectionParameters.OfType<OptionalAttribute>().Any())
                             {
@@ -496,10 +524,10 @@ namespace Protoinject
                             else
                             {
                                 throw new ActivationException(
-                                    "Expected " + argument.PlannedTarget.FullName + " to be resolved by now.", toCreate);
+                                    "Expected " + target.FullName + " to be resolved by now.", toCreate);
                             }
                         }
-                        return ((DefaultNode)argument.PlannedTarget).UntypedValue;
+                        return ((DefaultNode)target).UntypedValue;
                     }
                 case UnresolvedArgumentType.Factory:
                     return argument.FactoryDelegate;
@@ -562,12 +590,76 @@ namespace Protoinject
             IConstructorArgument[] arguments,
             Dictionary<Type, List<IMapping>> transientBindings)
         {
-            var resolvedMappings = ResolveTypes(requestedType, bindingName, current, transientBindings);
-            var plans = (IPlan[])Activator.CreateInstance(typeof(IPlan<>).MakeGenericType(requestedType).MakeArrayType(), resolvedMappings.Length);
-
             injectionAttributes = injectionAttributes ?? new IInjectionAttribute[0];
             arguments = arguments ?? new IConstructorArgument[0];
 
+            // If the plan requires an existing node, we must defer resolution until the plan
+            // has been fully formed.  For now, we create a node with Deferred set to
+            // true, the requested type and desired scope node (if applicable).
+            var requireExistingAttribute = injectionAttributes.OfType<RequireExistingAttribute>().FirstOrDefault();
+            if (requireExistingAttribute != null)
+            {
+                if (planRoot == null)
+                {
+                    // We can't defer resolution on a plan root (it doesn't even make sense
+                    // because there won't ever be anything to satisfy the request).
+                    throw new InvalidOperationException(
+                        "A plan root had a RequireExisting injection attribute, which " +
+                        "can't ever be satisfied.");
+                }
+
+                var deferredSearchOptions = new List<KeyValuePair<Type, INode>>();
+
+                // Add deferred search option if the current plan has a scope injection attribute.
+                var scopeAttribute = injectionAttributes.OfType<ScopeAttribute>().FirstOrDefault();
+                if (scopeAttribute != null)
+                {
+                    // We don't have a resolved mapping here, so we pass in null as the second argument.
+                    var scopeNode = scopeAttribute.ScopeFromContext(current, null);
+                    deferredSearchOptions.Add(new KeyValuePair<Type, INode>(
+                        requestedType,
+                        scopeNode));
+                }
+
+                // Add deferred search options based on explicit mappings in the kernel.
+                var requireResolvedMappings = ResolveTypes(requestedType, bindingName, current, transientBindings);
+                var requirePlans = (IPlan[])Activator.CreateInstance(typeof(IPlan<>).MakeGenericType(requestedType).MakeArrayType(), 1);
+                foreach (var mapping in requireResolvedMappings)
+                {
+                    // The mechanism of adding additional desired types based on the bindings
+                    // can only work for bindings that provide both a known target type, and
+                    // a lifetime scope.
+                    if (mapping.Target != null && mapping.LifetimeScope != null)
+                    {
+                        deferredSearchOptions.Add(new KeyValuePair<Type, INode>(
+                            mapping.Target,
+                            mapping.LifetimeScope.GetContainingNode()));
+                    }
+                }
+
+                // Create the deferred node.
+                Type nodeToCreate = typeof(DefaultNode<>).MakeGenericType(requestedType);
+                var createdNode = (DefaultNode)Activator.CreateInstance(nodeToCreate);
+                createdNode.Name = string.Empty;
+                createdNode.Parent = current;
+                createdNode.Planned = true;
+                createdNode.Deferred = true;
+                createdNode.DeferredSearchOptions = deferredSearchOptions.AsReadOnly();
+                createdNode.PlanName = planName;
+                createdNode.PlanRoot = planRoot;
+                createdNode.RequestedType = requestedType;
+
+                // Add it to the list of deferred nodes on the plan root.
+                planRoot.DeferredCreatedNodes.Add(createdNode);
+
+                // Set the required plans and return it.
+                requirePlans[0] = createdNode;
+                return requirePlans;
+            }
+
+            // Otherwise, construct plans based on the kernel configuration.
+            var resolvedMappings = ResolveTypes(requestedType, bindingName, current, transientBindings);
+            var plans = (IPlan[])Activator.CreateInstance(typeof(IPlan<>).MakeGenericType(requestedType).MakeArrayType(), resolvedMappings.Length);
             for (var i = 0; i < resolvedMappings.Length; i++)
             {
                 var resolvedMapping = resolvedMappings[i];
@@ -607,7 +699,7 @@ namespace Protoinject
                     {
                         if (existing.Planned && existing.PlanRoot != planRoot)
                         {
-                            // Flag that the plan root is now dependant on the other
+                            // Flag that the plan root is now dependent on the other
                             // plan being resolved.
                             planRoot?.DependentOnPlans.Add(existing.PlanRoot);
                         }
@@ -633,6 +725,7 @@ namespace Protoinject
                 createdNode.Type = targetNonGeneric ?? requestedType;
                 createdNode.PlanName = planName;
                 createdNode.PlanRoot = planRoot;
+                createdNode.RequestedType = requestedType;
 
                 if (createdNode.Type.ContainsGenericParameters)
                 {
@@ -859,6 +952,66 @@ namespace Protoinject
                 }
             }
 
+            // If we are the plan root, go back through all of the nodes we deferred and try to
+            // resolve them now that the plan has been fully created.
+            if (planRoot != null && planRoot == current)
+            {
+                foreach (var deferred in planRoot.DeferredCreatedNodes)
+                {
+                    // Search the deferred options.
+                    foreach (var searchOption in deferred.DeferredSearchOptions)
+                    {
+                        var type = searchOption.Key;
+                        var scopeNode = searchOption.Value;
+
+                        var existing =
+                            scopeNode.Children.FirstOrDefault(x => x.Type != null && type.IsAssignableFrom(x.Type));
+                        if (existing != null)
+                        {
+                            if (existing.Planned && existing.PlanRoot != planRoot)
+                            {
+                                // Flag that the plan root is now dependent on the other
+                                // plan being resolved.
+                                planRoot?.DependentOnPlans.Add(existing.PlanRoot);
+                            }
+
+                            // Set the existing node as the deferred target.
+                            ((DefaultNode)deferred).DeferredResolvedTarget = existing;
+                            break;
+                        }
+                    }
+
+                    // If this deferred node doesn't have any deferred search options, give a
+                    // more tailored error.
+                    if (deferred.DeferredSearchOptions.Count == 0)
+                    {
+                        ((DefaultNode) deferred).InvalidHint =
+                            "This node was deferred because it depends on an existing node " +
+                            "being in the tree, however, no search options were provided on " +
+                            "the deferred node.  This indicates that you have a parameter that " +
+                            "specifies [RequireExisting], but has no explicit scope set on the " +
+                            "parameter, and no explicit kernel bindings for '" + deferred.RequestedType + "' " +
+                            "which also provide scopes.  The deferred node can not be resolved.";
+                    }
+
+                    // If we didn't find a resolved target for this deferred node, invalidate
+                    // the deferred node.
+                    if (deferred.DeferredResolvedTarget == null)
+                    {
+                        ((DefaultNode)deferred).InvalidHint =
+                            "This node was deferred because it depends on an existing node " +
+                            "being in the tree, however, no search options yielded a resolution " +
+                            "for the node.  This usually indicates that an implementation was " +
+                            "expecting you to declare a dependent service elsewhere in the " +
+                            "hierarchy, but you haven't done so.  The request was looking for one of: \r\n" + 
+                            deferred.DeferredSearchOptions
+                                .Select(x => " * A '" + x.Key.FullName + "' within '" + x.Value.FullName + "'")
+                                .Aggregate((a, b) => a + "\r\n" + b);
+                    }
+                }
+            }
+
+
             return plans;
         }
 
@@ -981,3 +1134,4 @@ namespace Protoinject
         #endregion
     }
 }
+ 
