@@ -7,6 +7,7 @@ namespace Protoinject
         IBindInScopeWithDescendantFilterOrUniqueOrNamed To(Type type);
         IBindInScopeWithDescendantFilterOrUniqueOrNamed ToMethod(Func<IContext, object> resolve);
         IBindInScopeWithDescendantFilterOrUniqueOrNamed ToFactory();
+        IBindInScopeWithDescendantFilterOrUniqueOrNamed ToFactoryNotSupported();
     }
 
     public interface IBindToImplicit : IBindTo

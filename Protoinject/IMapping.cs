@@ -10,6 +10,8 @@ namespace Protoinject
 
         bool TargetFactory { get; }
 
+        bool TargetFactoryNotSupported { get; }
+
         INode OnlyUnderDescendantFilter { get; }
 
         IScope LifetimeScope { get; }

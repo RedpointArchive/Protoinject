@@ -58,6 +58,15 @@ namespace Protoinject
         public IBindInScopeWithDescendantFilterOrUniqueOrNamed ToFactory()
         {
             _mapping.TargetFactory = true;
+            _mapping.TargetFactoryNotSupported = false;
+            _mapping.UniquePerScope = false;
+            return this;
+        }
+
+        public IBindInScopeWithDescendantFilterOrUniqueOrNamed ToFactoryNotSupported()
+        {
+            _mapping.TargetFactory = true;
+            _mapping.TargetFactoryNotSupported = true;
             _mapping.UniquePerScope = false;
             return this;
         }

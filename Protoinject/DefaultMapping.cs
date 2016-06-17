@@ -34,5 +34,6 @@ namespace Protoinject
         public string Named { get; internal set; }
         public bool Valid => true;
         public bool TargetFactory { get; internal set; }
+        public bool TargetFactoryNotSupported { get; internal set; }
     }
 }

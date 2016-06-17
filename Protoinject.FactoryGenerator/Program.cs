@@ -100,6 +100,7 @@ namespace Protoinject.FactoryGenerator
             var getNodeForFactoryImplementation = 
                 assembly.MainModule.Import(iCurrentNodeDef.GetMethods().First(x => x.Name == "GetNodeForFactoryImplementation"));
             var getTypeFromHandle = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "System.Type").GetMethods().First(x => x.Name == "GetTypeFromHandle"));
+            var notSupportedExceptionCtor = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "System.NotSupportedException").GetConstructors().First(x => x.Parameters.Count == 0));
             var iConstructorArgument = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.IConstructorArgument"));
             var iInjectionAttribute = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.IInjectionAttribute"));
             var namedConstructorArgumentConstructor = assembly.MainModule.Import(
@@ -114,7 +115,7 @@ namespace Protoinject.FactoryGenerator
                 x.Parameters[3].ParameterType.Name == "String"));
             var generatedFactoryAttributeConstructor = assembly.MainModule.Import(
                 FindTypeInModuleOrReferences(assembly, "Protoinject.GeneratedFactoryAttribute").GetConstructors()
-                .First());
+                .First(x => x.Parameters.Count == 2));
 
             var iCurrentNode = assembly.MainModule.Import(iCurrentNodeDef);
             var iKernel = assembly.MainModule.Import(iKernelDef);
@@ -129,42 +130,42 @@ namespace Protoinject.FactoryGenerator
             {
                 if (type.CustomAttributes.Any(x => x.Constructor == generatedFactoryAttributeConstructor))
                 {
-                    Console.WriteLine("Factory already generated for: " + type);
+                    Console.WriteLine("Factories already generated for: " + type);
                     continue;
                 }
 
-                Console.WriteLine("Generating factory: " + type);
+                Console.WriteLine("Generating factories: " + type);
                 
-                var factory = new TypeDefinition(
+                var supportedFactory = new TypeDefinition(
                     "_GeneratedFactories",
                     "Generated" + type.Name.Substring(1),
                     TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AnsiClass |
                     TypeAttributes.BeforeFieldInit);
-                factory.BaseType = @object;
+                supportedFactory.BaseType = @object;
 
                 foreach (var gp in type.GenericParameters)
                 {
-                    var ngp = new GenericParameter(gp.Name, factory);
+                    var ngp = new GenericParameter(gp.Name, supportedFactory);
                     ngp.Attributes = gp.Attributes;
                     foreach (TypeReference gpc in gp.Constraints)
                         ngp.Constraints.Add(gpc);
-                    factory.GenericParameters.Add(ngp);
+                    supportedFactory.GenericParameters.Add(ngp);
                 }
                 
-                if (factory.GenericParameters.Count > 0)
+                if (supportedFactory.GenericParameters.Count > 0)
                 {
-                    factory.Interfaces.Add(type.MakeGenericInstanceType(factory.GenericParameters.Cast<TypeReference>().ToArray()));
+                    supportedFactory.Interfaces.Add(type.MakeGenericInstanceType(supportedFactory.GenericParameters.Cast<TypeReference>().ToArray()));
                 }
                 else
                 {
-                    factory.Interfaces.Add(type);
+                    supportedFactory.Interfaces.Add(type);
                 }
 
                 var currentField = new FieldDefinition("_current", FieldAttributes.Private | FieldAttributes.InitOnly, iNode);
-                factory.Fields.Add(currentField);
+                supportedFactory.Fields.Add(currentField);
 
                 var kernelField = new FieldDefinition("_kernel", FieldAttributes.Private | FieldAttributes.InitOnly, iKernel);
-                factory.Fields.Add(kernelField);
+                supportedFactory.Fields.Add(kernelField);
 
                 var ctor = new MethodDefinition(
                     ".ctor",
@@ -173,7 +174,7 @@ namespace Protoinject.FactoryGenerator
                         MethodAttributes.RTSpecialName,
                     type.Module.Import(typeof(void)));
                 ctor.Body.InitLocals = true;
-                factory.Methods.Add(ctor);
+                supportedFactory.Methods.Add(ctor);
 
                 ctor.Parameters.Add(new ParameterDefinition("node", ParameterAttributes.None, iCurrentNode));
                 ctor.Parameters.Add(new ParameterDefinition("kernel", ParameterAttributes.None, iKernel));
@@ -189,7 +190,7 @@ namespace Protoinject.FactoryGenerator
                 ctor.Body.Instructions.Add(Instruction.Create(OpCodes.Stfld, kernelField));
                 ctor.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
 
-                type.Module.Types.Add(factory);
+                type.Module.Types.Add(supportedFactory);
                 
                 foreach (var method in type.Methods)
                 {
@@ -197,7 +198,7 @@ namespace Protoinject.FactoryGenerator
                         MethodAttributes.Public | MethodAttributes.Final | MethodAttributes.HideBySig |
                         MethodAttributes.NewSlot | MethodAttributes.Virtual,
                         method.ReturnType);
-                    factory.Methods.Add(impl);
+                    supportedFactory.Methods.Add(impl);
                     
                     foreach (var gp in method.GenericParameters)
                     {
@@ -250,11 +251,80 @@ namespace Protoinject.FactoryGenerator
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Castclass, method.ReturnType));
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
                 }
+                
+                var notSupportedFactory = new TypeDefinition(
+                    "_GeneratedFactories",
+                    "NotSupportedGenerated" + type.Name.Substring(1),
+                    TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.AnsiClass |
+                    TypeAttributes.BeforeFieldInit);
+                notSupportedFactory.BaseType = @object;
+
+                foreach (var gp in type.GenericParameters)
+                {
+                    var ngp = new GenericParameter(gp.Name, notSupportedFactory);
+                    ngp.Attributes = gp.Attributes;
+                    foreach (TypeReference gpc in gp.Constraints)
+                        ngp.Constraints.Add(gpc);
+                    notSupportedFactory.GenericParameters.Add(ngp);
+                }
+
+                if (notSupportedFactory.GenericParameters.Count > 0)
+                {
+                    notSupportedFactory.Interfaces.Add(type.MakeGenericInstanceType(notSupportedFactory.GenericParameters.Cast<TypeReference>().ToArray()));
+                }
+                else
+                {
+                    notSupportedFactory.Interfaces.Add(type);
+                }
+
+                ctor = new MethodDefinition(
+                    ".ctor",
+                    MethodAttributes.Public | MethodAttributes.CompilerControlled |
+                        MethodAttributes.SpecialName | MethodAttributes.HideBySig |
+                        MethodAttributes.RTSpecialName,
+                    type.Module.Import(typeof(void)));
+                ctor.Body.InitLocals = true;
+                notSupportedFactory.Methods.Add(ctor);
+
+                ctor.Body.Instructions.Add(Instruction.Create(OpCodes.Ldarg_0));
+                ctor.Body.Instructions.Add(Instruction.Create(OpCodes.Call, objectConstructor));
+                ctor.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+
+                type.Module.Types.Add(notSupportedFactory);
+
+                foreach (var method in type.Methods)
+                {
+                    var impl = new MethodDefinition(method.Name,
+                        MethodAttributes.Public | MethodAttributes.Final | MethodAttributes.HideBySig |
+                        MethodAttributes.NewSlot | MethodAttributes.Virtual,
+                        method.ReturnType);
+                    notSupportedFactory.Methods.Add(impl);
+
+                    foreach (var gp in method.GenericParameters)
+                    {
+                        var ngp = new GenericParameter(gp.Name, impl);
+                        ngp.Attributes = gp.Attributes;
+                        foreach (TypeReference gpc in gp.Constraints)
+                            ngp.Constraints.Add(gpc);
+                        impl.GenericParameters.Add(ngp);
+                    }
+
+                    foreach (var p in method.Parameters)
+                    {
+                        impl.Parameters.Add(new ParameterDefinition(p.ParameterType) { Name = p.Name });
+                    }
+
+                    impl.Body.InitLocals = true;
+
+                    impl.Body.Instructions.Add(Instruction.Create(OpCodes.Newobj, notSupportedExceptionCtor));
+                    impl.Body.Instructions.Add(Instruction.Create(OpCodes.Throw));
+                }
 
                 var attribute = new CustomAttribute(generatedFactoryAttributeConstructor);
-                attribute.ConstructorArguments.Add(new CustomAttributeArgument(@string, factory.FullName));
+                attribute.ConstructorArguments.Add(new CustomAttributeArgument(@string, supportedFactory.FullName));
+                attribute.ConstructorArguments.Add(new CustomAttributeArgument(@string, notSupportedFactory.FullName));
                 type.CustomAttributes.Add(attribute);
-
+                
                 modified = true;
             }
 

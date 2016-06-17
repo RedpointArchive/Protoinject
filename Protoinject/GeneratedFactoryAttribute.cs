@@ -10,9 +10,17 @@ namespace Protoinject
     {
         public string FullTypeName { get; }
 
+        public string NotSupportedFullTypeName { get; }
+
         public GeneratedFactoryAttribute(string fullTypeName)
         {
             FullTypeName = fullTypeName;
+        }
+
+        public GeneratedFactoryAttribute(string fullTypeName, string notSupportedFullTypeName)
+        {
+            FullTypeName = fullTypeName;
+            NotSupportedFullTypeName = notSupportedFullTypeName;
         }
     }
 }

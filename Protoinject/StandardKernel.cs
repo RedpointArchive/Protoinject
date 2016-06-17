@@ -763,13 +763,17 @@ namespace Protoinject
                             continue;
                         }
 
+                        var targetName = resolvedMapping.TargetFactoryNotSupported
+                            ? attribute.NotSupportedFullTypeName
+                            : attribute.FullTypeName;
+
                         var resolvedFactoryClass = GetTypesForAssembly(createdNode.Type.Assembly)
-                                .FirstOrDefault(x => x.FullName == attribute.FullTypeName);
+                                .FirstOrDefault(x => x.FullName == targetName);
                         if (resolvedFactoryClass == null)
                         {
                             // This node won't be valid because it's planned, has no value and
                             // has no constructor.
-                            createdNode.InvalidHint = "The generated factory class '" + attribute.FullTypeName +
+                            createdNode.InvalidHint = "The generated factory class '" + targetName +
                                                       "' could not be found in the assembly.";
                             plans[i] = createdNode;
                             continue;
