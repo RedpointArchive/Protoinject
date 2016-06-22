@@ -33,6 +33,7 @@
     <Compile Include="IInjectionAttribute.cs" />
     <Compile Include="IKernel.cs" />
     <Compile Include="IMapping.cs" />
+    <Compile Include="InjectFieldsForBaseObjectInProtectedConstructorAttribute.cs" />
     <Compile Include="INode.cs" />
     <Compile Include="InvalidMapping.cs" />
     <Compile Include="IPlan.cs" />

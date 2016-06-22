@@ -377,6 +377,34 @@ namespace Protoinject
 
                         _hierarchy.ChangeObjectOnNode(toCreate, toCreate.UntypedValue);
 
+                        // If the object being created has [InjectFieldsForBaseObjectInProtectedConstructorAttribute]
+                        // on any of it's base classes, inject them now.
+                        var cls = toCreate.UntypedValue.GetType().BaseType;
+                        while (cls != null)
+                        {
+                            var wantsFieldsInjected = cls.CustomAttributes.Any(
+                                x =>
+                                    x.AttributeType ==
+                                    typeof(InjectFieldsForBaseObjectInProtectedConstructorAttribute));
+                            if (wantsFieldsInjected)
+                            {
+                                var nodeField = cls.GetField("_node", BindingFlags.NonPublic | BindingFlags.Instance);
+                                var hierarchyField = cls.GetField("_hierarchy", BindingFlags.NonPublic | BindingFlags.Instance);
+
+                                if (nodeField.FieldType == typeof(INode))
+                                {
+                                    nodeField.SetValue(toCreate.UntypedValue, toCreate);
+                                }
+
+                                if (hierarchyField.FieldType == typeof(IHierarchy))
+                                {
+                                    hierarchyField.SetValue(toCreate.UntypedValue, _hierarchy);
+                                }
+                            }
+
+                            cls = cls.BaseType;
+                        }
+
                         toCreate.PlannedConstructor.Invoke(toCreate.UntypedValue, parameters.ToArray());
                     }
                     catch (TargetInvocationException ex)
