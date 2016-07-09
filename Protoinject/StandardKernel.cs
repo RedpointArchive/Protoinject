@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -208,6 +209,16 @@ namespace Protoinject
             return CreatePlan(type, current, bindingName, planName, null, injectionAttributes, arguments, transientBindings);
         }
 
+        public IPlan<T> Plan<T>(INode current, string bindingName, string planName, INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
+        {
+            return (IPlan<T>)Plan(typeof(T), current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings);
+        }
+
+        public IPlan Plan(Type type, INode current, string bindingName, string planName, INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
+        {
+            return CreatePlan(type, current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings);
+        }
+
         public IPlan<T>[] PlanAll<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
         {
             return (IPlan<T>[])PlanAll(typeof(T), current, bindingName, planName, injectionAttributes, arguments, transientBindings);
@@ -216,6 +227,16 @@ namespace Protoinject
         public IPlan[] PlanAll(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
         {
             return CreatePlans(type, current, bindingName, planName, null, injectionAttributes, arguments, transientBindings);
+        }
+
+        public IPlan<T>[] PlanAll<T>(INode current, string bindingName, string planName, INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
+        {
+            return (IPlan<T>[])PlanAll(typeof(T), current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings);
+        }
+
+        public IPlan[] PlanAll(Type type, INode current, string bindingName, string planName, INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
+        {
+            return CreatePlans(type, current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings);
         }
 
         #endregion
@@ -233,12 +254,21 @@ namespace Protoinject
             {
                 throw new ActivationException("The planned node is not valid (hint: " + plan.InvalidHint + ")", plan);
             }
-
+            
             foreach (var toCreate in plan.PlannedCreatedNodes)
             {
                 if (!toCreate.Valid)
                 {
                     throw new ActivationException("The planned node is not valid (hint: " + toCreate.InvalidHint + ")", plan);
+                }
+
+                if (toCreate.PlanRoot == toCreate)
+                {
+                    throw new ActivationException(
+                        "The planned node has itself as the root plan.  This can occur when you " +
+                        "have manually constructed the plan, in which case you must ensure that " +
+                        "all child plans of the root plan have the root plan correctly set.",
+                        plan);
                 }
 
                 var node = (DefaultNode)toCreate;
@@ -691,6 +721,7 @@ namespace Protoinject
             for (var i = 0; i < resolvedMappings.Length; i++)
             {
                 var resolvedMapping = resolvedMappings[i];
+                var localPlanRoot = planRoot;
 
                 // If the resolved target is a generic type definition, we need to fill in the
                 // generic type arguments from the request.
@@ -725,11 +756,11 @@ namespace Protoinject
                         scopeNode.Children.FirstOrDefault(x => x.Type != null && x.Type.IsAssignableFrom(targetNonGeneric));
                     if (existing != null)
                     {
-                        if (existing.Planned && existing.PlanRoot != planRoot)
+                        if (existing.Planned && existing.PlanRoot != localPlanRoot)
                         {
                             // Flag that the plan root is now dependent on the other
                             // plan being resolved.
-                            planRoot?.DependentOnPlans.Add(existing.PlanRoot);
+                            localPlanRoot?.DependentOnPlans.Add(existing.PlanRoot);
                         }
 
                         plans[i] = existing;
@@ -752,18 +783,18 @@ namespace Protoinject
                 createdNode.Planned = true;
                 createdNode.Type = targetNonGeneric ?? requestedType;
                 createdNode.PlanName = planName;
-                createdNode.PlanRoot = planRoot;
+                createdNode.PlanRoot = localPlanRoot;
                 createdNode.RequestedType = requestedType;
-
+                
                 if (createdNode.Type.ContainsGenericParameters)
                 {
                     throw new InvalidOperationException("The type still contained generic type parameters even after initial binding resolution.");
                 }
 
                 // If there is no plan root, then we are the plan root.
-                if (planRoot == null)
+                if (localPlanRoot == null)
                 {
-                    planRoot = createdNode;
+                    localPlanRoot = createdNode;
                 }
 
                 try
@@ -883,7 +914,6 @@ namespace Protoinject
                         var parameter = parameters[ii];
 
                         var plannedArgument = new DefaultUnresolvedArgument();
-                        //plannedArgument.ParameterName = parameter.Name;
 
                         if (parameter.ParameterType == typeof (ICurrentNode))
                         {
@@ -932,7 +962,7 @@ namespace Protoinject
                                         createdNode,
                                         argument.Name,
                                         planName,
-                                        planRoot,
+                                        localPlanRoot,
                                         argument.InjectionParameters,
                                         null,
                                         transientBindings);
@@ -952,7 +982,7 @@ namespace Protoinject
                                         createdNode,
                                         argument.Name,
                                         planName,
-                                        planRoot,
+                                        localPlanRoot,
                                         argument.InjectionParameters,
                                         null,
                                         transientBindings);
@@ -980,7 +1010,7 @@ namespace Protoinject
                 }
                 finally
                 {
-                    planRoot.PlannedCreatedNodes.Add(createdNode);
+                    localPlanRoot.PlannedCreatedNodes.Add(createdNode);
                 }
             }
 
@@ -1042,7 +1072,6 @@ namespace Protoinject
                     }
                 }
             }
-
 
             return plans;
         }
