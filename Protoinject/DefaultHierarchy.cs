@@ -10,13 +10,13 @@ namespace Protoinject
 
         private Dictionary<object, List<INode>> _lookupCache;
 
-        private List<INode> _nodesTrackedInHierarchy;
+        private HashSet<INode> _nodesTrackedInHierarchy;
 
         public DefaultHierarchy()
         {
             _rootNodes = new List<INode>();
             _lookupCache = new Dictionary<object, List<INode>>();
-            _nodesTrackedInHierarchy = new List<INode>();
+            _nodesTrackedInHierarchy = new HashSet<INode>();
         }
 
         IReadOnlyCollection<INode> IHierarchy.RootNodes => _rootNodes.AsReadOnly();
