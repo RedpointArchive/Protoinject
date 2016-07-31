@@ -16,6 +16,8 @@ namespace Protoinject
         Type Type { get; }
 
         IReadOnlyCollection<INode> GetParents();
+
+        event EventHandler ChildrenChanged;
     }
 
     public interface INode<out T> : INode, IPlan<T>

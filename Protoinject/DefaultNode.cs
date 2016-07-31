@@ -12,21 +12,35 @@ namespace Protoinject
 
     internal class DefaultNode : INode
     {
+        private readonly List<INode> _childrenInternal;
+
         public DefaultNode()
         {
-            ChildrenInternal = new List<INode>();
+            _childrenInternal = new List<INode>();
             PlannedCreatedNodes = new List<IPlan>();
             DeferredCreatedNodes = new List<IPlan>();
             DeferredSearchOptions = new Dictionary<Type, INode>();
             DependentOnPlans = new List<IPlan>();
         }
 
-        internal List<INode> ChildrenInternal { get; }
+        internal void AddChild(INode node)
+        {
+            _childrenInternal.Add(node);
+            ChildrenChanged?.Invoke(this, new EventArgs());
+        }
+
+        internal void RemoveChild(INode node)
+        {
+            _childrenInternal.Remove(node);
+            ChildrenChanged?.Invoke(this, new EventArgs());
+        }
 
         public INode Parent { get; set; }
         public string Name { get; set; }
 
-        public IReadOnlyCollection<INode> Children => ChildrenInternal.AsReadOnly();
+        public IReadOnlyCollection<INode> Children => _childrenInternal.AsReadOnly();
+
+        public event EventHandler ChildrenChanged;
 
         public List<IPlan> PlannedCreatedNodes { get; }
         public List<IPlan> DeferredCreatedNodes { get; }

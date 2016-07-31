@@ -34,11 +34,11 @@ namespace Protoinject
 
         public void AddChildNode(IPlan parent, INode child)
         {
-            var children = ((DefaultNode)parent).ChildrenInternal;
-            if (!children.Contains(child))
+            if (!((INode) parent).Children.Contains(child))
             {
-                children.Add(child);
+                ((DefaultNode) parent).AddChild(child);
             }
+
             AddNodeToLookup(child);
         }
 
@@ -50,7 +50,7 @@ namespace Protoinject
 
         public void RemoveChildNode(IPlan parent, INode child)
         {
-            ((DefaultNode)parent).ChildrenInternal.Remove(child);
+            ((DefaultNode)parent).RemoveChild(child);
             RemoveNodeFromLookup(child);
         }
 
