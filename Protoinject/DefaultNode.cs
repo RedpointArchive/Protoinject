@@ -7,7 +7,21 @@ namespace Protoinject
 {
     internal class DefaultNode<T> : DefaultNode, INode<T>
     {
-        public T Value { get { return (T)UntypedValue; } }
+        private T _cachedValue;
+
+        public T Value
+        {
+            get
+            {
+                if (_valueChanged)
+                {
+                    _cachedValue = (T) UntypedValue;
+                    _valueChanged = false;
+                }
+
+                return _cachedValue;
+            }
+        }
     }
 
     internal class DefaultNode : INode
@@ -21,18 +35,36 @@ namespace Protoinject
             DeferredCreatedNodes = new List<IPlan>();
             DeferredSearchOptions = new Dictionary<Type, INode>();
             DependentOnPlans = new List<IPlan>();
+            _valueChanged = true;
         }
+
+        protected bool _valueChanged;
+        private object _untypedValue;
 
         internal void AddChild(INode node)
         {
             _childrenInternal.Add(node);
             ChildrenChanged?.Invoke(this, new EventArgs());
+
+            var a = this;
+            while (a != null)
+            {
+                a.DescendantsChanged?.Invoke(this, new EventArgs());
+                a = (DefaultNode) a.Parent;
+            }
         }
 
         internal void RemoveChild(INode node)
         {
             _childrenInternal.Remove(node);
             ChildrenChanged?.Invoke(this, new EventArgs());
+
+            var a = this;
+            while (a != null)
+            {
+                a.DescendantsChanged?.Invoke(this, new EventArgs());
+                a = (DefaultNode)a.Parent;
+            }
         }
 
         public INode Parent { get; set; }
@@ -41,6 +73,7 @@ namespace Protoinject
         public IReadOnlyCollection<INode> Children => _childrenInternal.AsReadOnly();
 
         public event EventHandler ChildrenChanged;
+        public event EventHandler DescendantsChanged;
 
         public List<IPlan> PlannedCreatedNodes { get; }
         public List<IPlan> DeferredCreatedNodes { get; }
@@ -74,7 +107,15 @@ namespace Protoinject
             }
         }
 
-        public object UntypedValue { get; set; }
+        public object UntypedValue
+        {
+            get { return _untypedValue; }
+            set
+            {
+                _untypedValue = value;
+                _valueChanged = true;
+            }
+        }
 
         public Type Type { get; set; }
 

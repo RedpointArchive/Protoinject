@@ -18,6 +18,8 @@ namespace Protoinject
         IReadOnlyCollection<INode> GetParents();
 
         event EventHandler ChildrenChanged;
+
+        event EventHandler DescendantsChanged;
     }
 
     public interface INode<out T> : INode, IPlan<T>
