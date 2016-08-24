@@ -56,6 +56,11 @@ namespace Protoinject
 
         public void RemoveNode(INode node)
         {
+            if (node == null)
+            {
+                return;
+            }
+
             if (_rootNodes.Contains(node))
             {
                 RemoveRootNode(node);
@@ -89,12 +94,12 @@ namespace Protoinject
                 throw new ArgumentNullException(nameof(obj));
             }
 
-            return new DefaultNode
-            {
-                UntypedValue = obj,
-                Type = obj.GetType(),
-                Discarded = false,
-            };
+            var nodeToCreate = typeof(DefaultNode<>).MakeGenericType(obj.GetType());
+            var createdNode = (DefaultNode)Activator.CreateInstance(nodeToCreate);
+            createdNode.UntypedValue = obj;
+            createdNode.Type = obj.GetType();
+            createdNode.Discarded = false;
+            return createdNode;
         }
 
         private void AddNodeToLookup(INode node)
