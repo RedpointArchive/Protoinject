@@ -40,6 +40,7 @@ namespace Protoinject.Test
                                 null,
                                 null,
                                 false,
+                                false,
                                 null)
                         }
                     }

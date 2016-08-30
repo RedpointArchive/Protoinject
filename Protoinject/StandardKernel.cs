@@ -445,6 +445,14 @@ namespace Protoinject
                 }
             }
 
+            if (plan.DiscardOnResolve.Count > 0)
+            {
+                foreach (var child in plan.DiscardOnResolve.ToList())
+                {
+                    _hierarchy.RemoveNode((INode) child);
+                }
+            }
+
             return (INode)plan;
         }
 
@@ -514,6 +522,14 @@ namespace Protoinject
             else
             {
                 _hierarchy.RemoveRootNode(planAsNode);
+            }
+            
+            if (plan.DiscardOnResolve.Count > 0)
+            {
+                foreach (var child in plan.DiscardOnResolve.ToList())
+                {
+                    _hierarchy.RemoveNode((INode)child);
+                }
             }
         }
 
@@ -799,6 +815,12 @@ namespace Protoinject
 
                 try
                 {
+                    if (resolvedMapping.DiscardNodeOnResolve)
+                    {
+                        // We discard this node from the hierarchy once the plan is resolved or discarded.
+                        localPlanRoot.DiscardOnResolve.Add(createdNode);
+                    }
+
                     if (resolvedMapping.TargetMethod != null)
                     {
                         createdNode.PlannedMethod = resolvedMapping.TargetMethod;

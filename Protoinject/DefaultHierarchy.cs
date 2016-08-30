@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace Protoinject
 {
@@ -8,22 +9,26 @@ namespace Protoinject
     {
         private List<INode> _rootNodes;
 
-        private Dictionary<object, List<INode>> _lookupCache;
-
-        private HashSet<INode> _nodesTrackedInHierarchy;
+        private ConditionalWeakTable<object, List<INode>> _lookupCache;
 
         public DefaultHierarchy()
         {
             _rootNodes = new List<INode>();
-            _lookupCache = new Dictionary<object, List<INode>>();
-            _nodesTrackedInHierarchy = new HashSet<INode>();
+            _lookupCache = new ConditionalWeakTable<object, List<INode>>();
         }
 
         IReadOnlyCollection<INode> IHierarchy.RootNodes => _rootNodes.AsReadOnly();
+        public int LookupCacheObjectCount => 0;
 
         public INode Lookup(object obj)
         {
-            return _lookupCache.ContainsKey(obj) ? _lookupCache[obj].FirstOrDefault() : null;
+            List<INode> value;
+            if (_lookupCache.TryGetValue(obj, out @value))
+            {
+                return @value.FirstOrDefault();
+            }
+
+            return null;
         }
 
         public void AddRootNode(INode node)
@@ -45,13 +50,11 @@ namespace Protoinject
         public void RemoveRootNode(INode node)
         {
             _rootNodes.Remove(node);
-            RemoveNodeFromLookup(node);
         }
 
         public void RemoveChildNode(IPlan parent, INode child)
         {
             ((DefaultNode)parent).RemoveChild(child);
-            RemoveNodeFromLookup(child);
         }
 
         public void RemoveNode(INode node)
@@ -81,8 +84,7 @@ namespace Protoinject
             {
                 throw new InvalidOperationException("The passed value needs to be an instance of or derive from " + ((DefaultNode)node).Type.FullName + ", but it does not.");
             }
-
-            RemoveNodeFromLookup(node);
+            
             ((DefaultNode)node).UntypedValue = newValue;
             AddNodeToLookup(node);
         }
@@ -99,48 +101,21 @@ namespace Protoinject
             createdNode.UntypedValue = obj;
             createdNode.Type = obj.GetType();
             createdNode.Discarded = false;
+            AddNodeToLookup(createdNode);
             return createdNode;
         }
 
         private void AddNodeToLookup(INode node)
         {
-            if (!_nodesTrackedInHierarchy.Contains(node))
+            if (node.UntypedValue != null)
             {
-                _nodesTrackedInHierarchy.Add(node);
-                if (node.UntypedValue != null)
-                {
-                    if (!_lookupCache.ContainsKey(node.UntypedValue))
-                    {
-                        _lookupCache[node.UntypedValue] = new List<INode>();
-                    }
-
-                    _lookupCache[node.UntypedValue].Add(node);
-                }
+                var list = _lookupCache.GetOrCreateValue(node.UntypedValue);
+                list.Add(node);
             }
+
             foreach (var child in node.Children)
             {
                 AddNodeToLookup(child);
-            }
-        }
-
-        private void RemoveNodeFromLookup(INode node)
-        {
-            if (_nodesTrackedInHierarchy.Contains(node))
-            {
-                _nodesTrackedInHierarchy.Remove(node);
-                if (node.UntypedValue != null)
-                {
-                    if (!_lookupCache.ContainsKey(node.UntypedValue))
-                    {
-                        _lookupCache[node.UntypedValue] = new List<INode>();
-                    }
-                    
-                    _lookupCache[node.UntypedValue].Remove(node);
-                }
-            }
-            foreach (var child in node.Children)
-            {
-                RemoveNodeFromLookup(child);
             }
         }
     }

@@ -18,6 +18,8 @@ namespace Protoinject
 
         bool UniquePerScope { get; }
 
+        bool DiscardNodeOnResolve { get; }
+
         string Named { get; }
 
         bool Valid { get; }

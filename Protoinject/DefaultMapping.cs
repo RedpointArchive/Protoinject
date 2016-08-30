@@ -15,6 +15,7 @@ namespace Protoinject
             INode onlyUnderDescendantFilter,
             IScope lifetimeScope,
             bool uniquePerScope,
+            bool discardNodeOnResolve,
             string named)
         {
             Target = target;
@@ -23,6 +24,7 @@ namespace Protoinject
             OnlyUnderDescendantFilter = onlyUnderDescendantFilter;
             LifetimeScope = lifetimeScope;
             UniquePerScope = uniquePerScope;
+            DiscardNodeOnResolve = discardNodeOnResolve;
             Named = named;
         }
 
@@ -31,6 +33,7 @@ namespace Protoinject
         public INode OnlyUnderDescendantFilter { get; internal set; }
         public IScope LifetimeScope { get; internal set; }
         public bool UniquePerScope { get; internal set; }
+        public bool DiscardNodeOnResolve { get; internal set; }
         public string Named { get; internal set; }
         public bool Valid => true;
         public bool TargetFactory { get; internal set; }

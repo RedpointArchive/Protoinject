@@ -6,6 +6,8 @@ namespace Protoinject
     {
         IReadOnlyCollection<INode> RootNodes { get; }
 
+        int LookupCacheObjectCount { get; }
+
         INode Lookup(object obj);
 
         void AddRootNode(INode node);

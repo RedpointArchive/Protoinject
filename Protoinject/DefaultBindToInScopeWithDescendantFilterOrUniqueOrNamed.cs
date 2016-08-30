@@ -71,9 +71,16 @@ namespace Protoinject
             return this;
         }
 
-        public void InTransientScope()
+        public IBindUnique DiscardNodeOnResolve()
+        {
+            _mapping.DiscardNodeOnResolve = true;
+            return this;
+        }
+
+        public IBindUnique InParentScope()
         {
             // No change required.
+            return this;
         }
 
         public IBindUnique InSingletonScope()

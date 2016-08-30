@@ -44,6 +44,8 @@ namespace Protoinject
         string InvalidHint { get; }
 
         Type RequestedType { get; }
+
+        List<IPlan> DiscardOnResolve { get; }
     }
 
     public interface IPlan<out T> : IPlan

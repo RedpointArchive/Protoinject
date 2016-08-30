@@ -17,6 +17,8 @@ namespace Protoinject
 
         IReadOnlyCollection<INode> GetParents();
 
+        event ValueChangedEventHandler ValueChanged;
+
         event EventHandler ChildrenChanged;
 
         event EventHandler DescendantsChanged;

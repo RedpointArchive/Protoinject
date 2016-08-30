@@ -35,8 +35,11 @@ namespace Protoinject
             DeferredCreatedNodes = new List<IPlan>();
             DeferredSearchOptions = new Dictionary<Type, INode>();
             DependentOnPlans = new List<IPlan>();
+            DiscardOnResolve = new List<IPlan>();
             _valueChanged = true;
         }
+
+        public List<IPlan> DiscardOnResolve { get; set; }
 
         protected bool _valueChanged;
         private object _untypedValue;
@@ -71,7 +74,8 @@ namespace Protoinject
         public string Name { get; set; }
 
         public IReadOnlyCollection<INode> Children => _childrenInternal.AsReadOnly();
-
+        
+        public event ValueChangedEventHandler ValueChanged;
         public event EventHandler ChildrenChanged;
         public event EventHandler DescendantsChanged;
 
@@ -110,10 +114,15 @@ namespace Protoinject
         public object UntypedValue
         {
             get { return _untypedValue; }
-            set
+            internal set
             {
-                _untypedValue = value;
-                _valueChanged = true;
+                if (_untypedValue != value)
+                {
+                    var oldValue = _untypedValue;
+                    _untypedValue = value;
+                    _valueChanged = true;
+                    ValueChanged?.Invoke(this, new ValueChangedEventArgs {OldValue = oldValue, NewValue = _untypedValue});
+                }
             }
         }
 

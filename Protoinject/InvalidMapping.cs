@@ -11,6 +11,7 @@ namespace Protoinject
         public INode OnlyUnderDescendantFilter { get; }
         public IScope LifetimeScope { get; }
         public bool UniquePerScope { get; }
+        public bool DiscardNodeOnResolve { get; }
         public bool Valid => false;
         public string Named { get; }
     }

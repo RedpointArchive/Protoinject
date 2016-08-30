@@ -52,5 +52,7 @@
     <Compile Include="ScopeAttribute.cs" />
     <Compile Include="StandardKernel.cs" />
     <Compile Include="UnresolvedArgumentType.cs" />
+    <Compile Include="ValueChangedEventArgs.cs" />
+    <Compile Include="ValueChangedEventHandler.cs" />
   </Files>
 </Project>

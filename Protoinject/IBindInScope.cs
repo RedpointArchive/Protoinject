@@ -2,7 +2,8 @@ namespace Protoinject
 {
     public interface IBindInScope
     {
-        void InTransientScope();
+        IBindUnique DiscardNodeOnResolve();
+        IBindUnique InParentScope();
         IBindUnique InSingletonScope();
         IBindUnique InScope(IScope scope);
     }
