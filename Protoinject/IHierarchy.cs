@@ -14,6 +14,8 @@ namespace Protoinject
 
         void AddChildNode(IPlan parent, INode child);
 
+        void MoveNode(IPlan newParent, INode child);
+
         void RemoveRootNode(INode node);
 
         void RemoveChildNode(IPlan parent, INode child);

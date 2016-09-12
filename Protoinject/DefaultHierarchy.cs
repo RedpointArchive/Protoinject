@@ -47,6 +47,18 @@ namespace Protoinject
             AddNodeToLookup(child);
         }
 
+        public void MoveNode(IPlan newParent, INode child)
+        {
+            RemoveNode(child);
+            AddChildNode(newParent, child);
+
+            // Since we're moving the node, update it's parent.  We don't
+            // always do this on AddChildNode / RemoveNode, because we might
+            // be adding a reference from one node to a node that is already
+            // parented to something else.
+            ((DefaultNode)child).Parent = (INode)newParent;
+        }
+
         public void RemoveRootNode(INode node)
         {
             _rootNodes.Remove(node);
@@ -95,6 +107,13 @@ namespace Protoinject
             {
                 throw new ArgumentNullException(nameof(obj));
             }
+
+#if DEBUG
+            if (Lookup(obj) != null)
+            {
+                throw new InvalidOperationException("You must not call CreateNodeForObject if there is already a node associated with this object in the hierarchy.  Call Lookup instead.");
+            }
+#endif
 
             var nodeToCreate = typeof(DefaultNode<>).MakeGenericType(obj.GetType());
             var createdNode = (DefaultNode)Activator.CreateInstance(nodeToCreate);
