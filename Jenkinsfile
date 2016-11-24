@@ -1,4 +1,4 @@
 #!/usr/bin/env groovy
-@Library('Protobuild.JenkinsHelpers@0.1')
+@Library('Protobuild.JenkinsHelpers@0.2.3')
 import protobuild
-protobuild('Protoinject', 'https://github.com/RedpointGames/Protoinject')
+protobuild()

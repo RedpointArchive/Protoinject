@@ -1,11 +1,17 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Module>
   <Name>Protoinject</Name>
+  <Authors>Redpoint Games</Authors>
+  <SemanticVersion>1.0.0</SemanticVersion>
+  <Description>Protoinject is an asynchronous, hierarchical, multi-phase dependency injection system.</Description>
+  <LicenseUrl>https://opensource.org/licenses/MIT</LicenseUrl>
+  <ProjectUrl>https://github.com/RedpointGames/Protoinject</ProjectUrl>
+  <GitRepositoryUrl>https://github.com/RedpointGames/Protoinject</GitRepositoryUrl>
   <DefaultAction>resync</DefaultAction>
   <DisableSynchronisation>false</DisableSynchronisation>
   <GenerateNuGetRepositories>true</GenerateNuGetRepositories>
   <Packages>
     <Package Uri="https-nuget://www.nuget.org/api/v2/|Mono.Cecil" Folder="Mono.Cecil" GitRef="0.9.6.1" />
-    <Package Uri="https://protobuild.org/hach-que/Prototest" Folder="Prototest" GitRef="master" />
+    <Package Repository="https://api.nuget.org/v3/index.json" Package="Prototest" Version="master" />
   </Packages>
 </Module>

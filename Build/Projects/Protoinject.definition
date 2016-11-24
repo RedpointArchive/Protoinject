@@ -7,6 +7,7 @@
   <Files>
     <Compile Include="AbsolutePositionalConstructorArgument.cs" />
     <Compile Include="ActivationException.cs" />
+    <Compile Include="AsyncHelpers.cs" />
     <Compile Include="DefaultBindToInScopeWithDescendantFilterOrUniqueOrNamed.cs" />
     <Compile Include="DefaultContext.cs" />
     <Compile Include="DefaultCurrentNode.cs" />
