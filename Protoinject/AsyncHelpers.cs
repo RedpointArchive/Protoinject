@@ -21,7 +21,6 @@ namespace Protoinject
                 catch (Exception e)
                 {
                     sync.InnerException = e;
-                    throw;
                 }
                 finally
                 {
@@ -29,6 +28,10 @@ namespace Protoinject
                 }
             }, null);
             sync.BeginMessageLoop();
+            if (sync.InnerException != null)
+            {
+                throw new AggregateException(sync.InnerException);
+            }
             SynchronizationContext.SetSynchronizationContext(oldContext);
         }
 
@@ -47,7 +50,6 @@ namespace Protoinject
                 catch (Exception e)
                 {
                     sync.InnerException = e;
-                    throw;
                 }
                 finally
                 {
@@ -55,6 +57,10 @@ namespace Protoinject
                 }
             }, null);
             sync.BeginMessageLoop();
+            if (sync.InnerException != null)
+            {
+                throw new AggregateException(sync.InnerException);
+            }
             SynchronizationContext.SetSynchronizationContext(oldContext);
             return ret;
         }
