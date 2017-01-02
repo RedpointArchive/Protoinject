@@ -1,4 +1,6 @@
-﻿using System;
+﻿#if !PLATFORM_UNITY
+
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -126,3 +128,5 @@ namespace Protoinject
         }
     }
 }
+
+#endif

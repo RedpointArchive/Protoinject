@@ -1,17 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
-using System.Runtime.Hosting;
 using System.Runtime.Serialization;
+#if !PLATFORM_UNITY
+using System.Runtime.ExceptionServices;
+#endif
+#if !PLATFORM_UNITY
 using System.Threading.Tasks;
+#endif
+#if PLATFORM_UNITY
+using Protoinject.UnityClasses;
+#endif
 
 namespace Protoinject
 {
-    public class StandardKernel : IKernel
+    public partial class StandardKernel : IKernel
     {
         private Dictionary<Type, List<IMapping>> _bindings;
 
@@ -28,9 +32,10 @@ namespace Protoinject
             _assemblyTypeCache = new Dictionary<Assembly, Type[]>();
         }
 
-        public IHierarchy Hierarchy => _hierarchy;
-
-        #region Module Loading
+        public IHierarchy Hierarchy
+        {
+            get { return _hierarchy; }
+        }
 
         public void Load<T>() where T : IProtoinjectModule
         {
@@ -42,24 +47,20 @@ namespace Protoinject
             module.Load(this);
         }
 
-        #endregion
-
-        #region Binding / Unbinding
-
         public IBindToInScopeWithDescendantFilterOrUniqueOrNamed<TInterface> Bind<TInterface>()
         {
             List<IMapping> list;
-            if (!_bindings.ContainsKey(typeof (TInterface)))
+            if (!_bindings.ContainsKey(typeof(TInterface)))
             {
                 list = new List<IMapping>();
-                _bindings[typeof (TInterface)] = list;
+                _bindings[typeof(TInterface)] = list;
             }
             else
             {
-                list = _bindings[typeof (TInterface)];
+                list = _bindings[typeof(TInterface)];
             }
             var mapping = new DefaultMapping();
-            mapping.Target = typeof (TInterface);
+            mapping.Target = typeof(TInterface);
             list.Add(mapping);
             return new DefaultBindToInScopeWithDescendantFilterOrUnique<TInterface>(this, mapping);
         }
@@ -91,10 +92,6 @@ namespace Protoinject
         {
             _bindings[@interface] = new List<IMapping>();
         }
-
-        #endregion
-
-        #region Scope / Node Control
 
         public IScope CreateScopeFromNode(INode node)
         {
@@ -129,250 +126,15 @@ namespace Protoinject
             return _singletonScope;
         }
 
-        #endregion
-
-        #region Get / TryGet / GetAll
-
-        public T Get<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            var plan = Plan<T>(current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-            Validate(plan);
-            return Resolve(plan);
-        }
-
-        public async Task<T> GetAsync<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes,
-            IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            var plan = await PlanAsync<T>(current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-            await ValidateAsync(plan);
-            return await ResolveAsync(plan);
-        }
-
-        public object Get(Type type, INode current, string bindingName, string planName,
-            IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments,
-            Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            var plan = Plan(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-            Validate(plan);
-            return Resolve(plan);
-        }
-
-        public async Task<object> GetAsync(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes,
-            IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            var plan = await PlanAsync(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-            await ValidateAsync(plan);
-            return await ResolveAsync(plan);
-        }
-
-        public T TryGet<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments,
-            Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            var plan = Plan<T>(current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-            try
-            {
-                Validate(plan);
-                return Resolve(plan);
-            }
-            catch (Exception)
-            {
-                Discard(plan);
-                return (T)(object)null;
-            }
-        }
-
-        public async Task<T> TryGetAsync<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes,
-            IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            var plan = await PlanAsync<T>(current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-            try
-            {
-                await ValidateAsync(plan);
-                return await ResolveAsync(plan);
-            }
-            catch (Exception)
-            {
-                await DiscardAsync(plan);
-                return (T)(object)null;
-            }
-        }
-
-        public object TryGet(Type type, INode current, string bindingName, string planName,
-            IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments,
-            Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            var plan = Plan(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-            try
-            {
-                Validate(plan);
-                return Resolve(plan);
-            }
-            catch (Exception)
-            {
-                Discard(plan);
-                return null;
-            }
-        }
-
-        public async Task<object> TryGetAsync(Type type, INode current, string bindingName, string planName,
-            IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            var plan = await PlanAsync(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-            try
-            {
-                await ValidateAsync(plan);
-                return await ResolveAsync(plan);
-            }
-            catch (Exception)
-            {
-                await DiscardAsync(plan);
-                return null;
-            }
-        }
-
-        public T[] GetAll<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            var plans = PlanAll<T>(current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-            ValidateAll(plans);
-            return ResolveAll(plans);
-        }
-
-        public async Task<T[]> GetAllAsync<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes,
-            IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            var plans = await PlanAllAsync<T>(current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-            await ValidateAllAsync(plans);
-            return await ResolveAllAsync(plans);
-        }
-
-        public object[] GetAll(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            var plans = PlanAll(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-            ValidateAll(plans);
-            return ResolveAll(plans);
-        }
-
-        public async Task<object[]> GetAllAsync(Type type, INode current, string bindingName, string planName,
-            IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            var plans = await PlanAllAsync(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-            await ValidateAllAsync(plans);
-            return await ResolveAllAsync(plans);
-        }
-
-        #endregion
-
-        #region Planning
-
-        public IPlan<T> Plan<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return (IPlan<T>) Plan(typeof (T), current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-        }
-
-        public async Task<IPlan<T>> PlanAsync<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes,
-            IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return (IPlan<T>) await PlanAsync(typeof(T), current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-        }
-
-        public IPlan Plan(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return AsyncHelpers.RunSync(() => PlanAsync(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings));
-        }
-
-        public async Task<IPlan> PlanAsync(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes,
-            IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return await CreatePlan(type, current, bindingName, planName, null, injectionAttributes, arguments, transientBindings);
-        }
-
-        public IPlan<T> Plan<T>(INode current, string bindingName, string planName, INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return (IPlan<T>)Plan(typeof(T), current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings);
-        }
-
-        public async Task<IPlan<T>> PlanAsync<T>(INode current, string bindingName, string planName, INode planRoot,
-            IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return (IPlan<T>) await PlanAsync(typeof(T), current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings);
-        }
-
-        public IPlan Plan(Type type, INode current, string bindingName, string planName, INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return AsyncHelpers.RunSync(() => PlanAsync(type, current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings));
-        }
-
-        public async Task<IPlan> PlanAsync(Type type, INode current, string bindingName, string planName, INode planRoot,
-            IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return await CreatePlan(type, current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings);
-        }
-
-        public IPlan<T>[] PlanAll<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return (IPlan<T>[])PlanAll(typeof(T), current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-        }
-
-        public async Task<IPlan<T>[]> PlanAllAsync<T>(INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes,
-            IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return (IPlan<T>[]) await PlanAllAsync(typeof(T), current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-        }
-
-        public IPlan[] PlanAll(Type type, INode current, string bindingName, string planName, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return AsyncHelpers.RunSync(() => PlanAllAsync(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings));
-        }
-
-        public async Task<IPlan[]> PlanAllAsync(Type type, INode current, string bindingName, string planName,
-            IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return await CreatePlans(type, current, bindingName, planName, null, injectionAttributes, arguments, transientBindings);
-        }
-
-        public IPlan<T>[] PlanAll<T>(INode current, string bindingName, string planName, INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return (IPlan<T>[])PlanAll(typeof(T), current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings);
-        }
-
-        public async Task<IPlan<T>[]> PlanAllAsync<T>(INode current, string bindingName, string planName, INode planRoot,
-            IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return (IPlan<T>[]) await PlanAllAsync(typeof(T), current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings);
-        }
-
-        public IPlan[] PlanAll(Type type, INode current, string bindingName, string planName, INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return AsyncHelpers.RunSync(() => PlanAllAsync(type, current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings));
-        }
-
-        public async Task<IPlan[]> PlanAllAsync(Type type, INode current, string bindingName, string planName, INode planRoot,
-            IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments, Dictionary<Type, List<IMapping>> transientBindings)
-        {
-            return await CreatePlans(type, current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings);
-        }
-
-        #endregion
-
-        #region Validation
-
-        public void Validate<T>(IPlan<T> plan)
-        {
-            Validate((IPlan)plan);
-        }
-
-        public async Task ValidateAsync<T>(IPlan<T> plan)
-        {
-            await ValidateAsync((IPlan)plan);
-        }
-
         public void Validate(IPlan plan)
         {
+#if !PLATFORM_UNITY
             AsyncHelpers.RunSync(() => ValidateAsync(plan));
         }
 
         public async Task ValidateAsync(IPlan plan)
         {
+#endif
             if (!plan.Valid)
             {
                 throw new ActivationException("The planned node is not valid (hint: " + plan.InvalidHint + ")", plan);
@@ -410,7 +172,11 @@ namespace Protoinject
                             case UnresolvedArgumentType.Type:
                                 if (argument.IsMultipleResult)
                                 {
+#if !PLATFORM_UNITY
                                     for (int index = 0; index < argument.PlannedTargets.Length; index++)
+#else
+                                    for (int index = 0; index < argument.PlannedTargets.Count; index++)
+#endif
                                     {
                                         var target = argument.PlannedTargets[index];
 
@@ -426,76 +192,64 @@ namespace Protoinject
                     }
                 }
             }
-            
+
             // TODO: Validate more configuration
         }
 
-        private void ValidateArgument(IUnresolvedArgument argument, IPlan target)
+        public void Discard(IPlan plan)
         {
-            if (argument.InjectionParameters.OfType<OptionalAttribute>().Any())
+#if !PLATFORM_UNITY
+            AsyncHelpers.RunSync(() => DiscardAsync(plan));
+        }
+
+        public async Task DiscardAsync(IPlan plan)
+        {
+#endif
+            var planAsNode = (DefaultNode)plan;
+            planAsNode.Discarded = true;
+            foreach (var plan1 in planAsNode.PlannedCreatedNodes)
             {
-                // Optional arguments are always valid, because the result will
-                // simply be null when injected.
-                return;
+                var toCreate = (DefaultNode)plan1;
+                var parent = toCreate.ParentPlan;
+                if (parent != null)
+                {
+                    _hierarchy.RemoveChildNode(parent, toCreate);
+                }
+                else
+                {
+                    _hierarchy.RemoveRootNode(toCreate);
+                }
+                toCreate.Parent = null;
+                toCreate.Discarded = true;
+            }
+            var nodeParent = planAsNode.ParentPlan;
+            if (nodeParent != null)
+            {
+                _hierarchy.RemoveChildNode(nodeParent, planAsNode);
+            }
+            else
+            {
+                _hierarchy.RemoveRootNode(planAsNode);
             }
 
-            if (!target.Valid)
+            if (plan.DiscardOnResolve.Count > 0)
             {
-                throw new ActivationException("The planned node is not valid (hint: " + target.InvalidHint + ")", target);
+                foreach (var child in plan.DiscardOnResolve.ToList())
+                {
+                    _hierarchy.RemoveNode((INode)child);
+                }
             }
-        }
-
-        public void ValidateAll<T>(IPlan<T>[] plans)
-        {
-            AsyncHelpers.RunSync(() => ValidateAllAsync(plans));
-        }
-
-        public async Task ValidateAllAsync<T>(IPlan<T>[] plans)
-        {
-            var tasks = new Task[plans.Length];
-            for (var i = 0; i < plans.Length; i++)
-            {
-                tasks[i] = ValidateAsync(plans[i]);
-            }
-            await Task.WhenAll(tasks);
-        }
-
-        public void ValidateAll(IPlan[] plans)
-        {
-            AsyncHelpers.RunSync(() => ValidateAllAsync(plans));
-        }
-
-        public async Task ValidateAllAsync(IPlan[] plans)
-        {
-            var tasks = new Task[plans.Length];
-            for (var i = 0; i < plans.Length; i++)
-            {
-                tasks[i] = ValidateAsync(plans[i]);
-            }
-            await Task.WhenAll(tasks);
-        }
-
-        #endregion
-
-        #region Resolution
-
-        public INode<T> ResolveToNode<T>(IPlan<T> plan)
-        {
-            return (INode<T>)ResolveToNode((IPlan)plan);
-        }
-
-        public async Task<INode<T>> ResolveToNodeAsync<T>(IPlan<T> plan)
-        {
-            return (INode<T>) await ResolveToNodeAsync((IPlan)plan);
         }
 
         public INode ResolveToNode(IPlan plan)
         {
+#if !PLATFORM_UNITY
             return AsyncHelpers.RunSync(() => ResolveToNodeAsync(plan));
         }
 
         public async Task<INode> ResolveToNodeAsync(IPlan plan)
         {
+#endif
             if (!plan.Planned)
             {
                 return (INode)plan;
@@ -544,7 +298,11 @@ namespace Protoinject
                     var parameters = new List<object>();
                     foreach (var argument in toCreate.PlannedConstructorArguments)
                     {
+#if !PLATFORM_UNITY
                         parameters.Add(await ResolveArgument(toCreate, argument));
+#else
+                        parameters.Add(ResolveArgument(toCreate, argument));
+#endif
                     }
                     try
                     {
@@ -559,10 +317,8 @@ namespace Protoinject
                         var cls = toCreate.UntypedValue.GetType().BaseType;
                         while (cls != null)
                         {
-                            var wantsFieldsInjected = cls.CustomAttributes.Any(
-                                x =>
-                                    x.AttributeType ==
-                                    typeof(InjectFieldsForBaseObjectInProtectedConstructorAttribute));
+                            var wantsFieldsInjected = cls.GetCustomAttributes(false).Any(
+                                x => x is InjectFieldsForBaseObjectInProtectedConstructorAttribute);
                             if (wantsFieldsInjected)
                             {
                                 var nodeField = cls.GetField("_node", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -586,7 +342,11 @@ namespace Protoinject
                     }
                     catch (TargetInvocationException ex)
                     {
+#if !PLATFORM_UNITY
                         ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+#else
+                        throw ex.InnerException;
+#endif
                     }
                     toCreate.Planned = false;
                 }
@@ -603,186 +363,24 @@ namespace Protoinject
             return (INode)plan;
         }
 
-        public INode<T>[] ResolveAllToNode<T>(IPlan<T>[] plans)
-        {
-            return AsyncHelpers.RunSync(() => ResolveAllToNodeAsync(plans));
-        }
-
-        public async Task<INode<T>[]> ResolveAllToNodeAsync<T>(IPlan<T>[] plans)
-        {
-            var tasks = new Task<INode<T>>[plans.Length];
-            for (var i = 0; i < plans.Length; i++)
-            {
-                tasks[i] = ResolveToNodeAsync(plans[i]);
-            }
-            await Task.WhenAll(tasks);
-            return tasks.Select(x => x.Result).ToArray();
-        }
-
-        public INode[] ResolveAllToNode(IPlan[] plans)
-        {
-            return AsyncHelpers.RunSync(() => ResolveAllToNodeAsync(plans));
-        }
-
-        public async Task<INode[]> ResolveAllToNodeAsync(IPlan[] plans)
-        {
-            var tasks = new Task<INode>[plans.Length];
-            for (var i = 0; i < plans.Length; i++)
-            {
-                tasks[i] = ResolveToNodeAsync(plans[i]);
-            }
-            await Task.WhenAll(tasks);
-            return tasks.Select(x => x.Result).ToArray();
-        }
-
-        public T Resolve<T>(IPlan<T> plan)
-        {
-            return AsyncHelpers.RunSync(() => ResolveAsync(plan));
-        }
-
-        public async Task<T> ResolveAsync<T>(IPlan<T> plan)
-        {
-            return (await ResolveToNodeAsync(plan)).Value;
-        }
-
-        public object Resolve(IPlan plan)
-        {
-            return AsyncHelpers.RunSync(() => ResolveAsync(plan));
-        }
-
-        public async Task<object> ResolveAsync(IPlan plan)
-        {
-            return (await ResolveToNodeAsync(plan)).UntypedValue;
-        }
-
-        public T[] ResolveAll<T>(IPlan<T>[] plans)
-        {
-            return AsyncHelpers.RunSync(() => ResolveAllAsync(plans));
-        }
-
-        public async Task<T[]> ResolveAllAsync<T>(IPlan<T>[] plans)
-        {
-            var tasks = new Task<T>[plans.Length];
-            for (var i = 0; i < plans.Length; i++)
-            {
-                tasks[i] = ResolveAsync(plans[i]);
-            }
-            await Task.WhenAll(tasks);
-            return tasks.Select(x => x.Result).ToArray();
-        }
-
-        public object[] ResolveAll(IPlan[] plans)
-        {
-            return AsyncHelpers.RunSync(() => ResolveAllAsync(plans));
-        }
-
-        public async Task<object[]> ResolveAllAsync(IPlan[] plans)
-        {
-            var tasks = new Task<object>[plans.Length];
-            for (var i = 0; i < plans.Length; i++)
-            {
-                tasks[i] = ResolveAsync(plans[i]);
-            }
-            await Task.WhenAll(tasks);
-            return tasks.Select(x => x.Result).ToArray();
-        }
-
-        #endregion
-
-        #region Discard
-
-        public void Discard<T>(IPlan<T> plan)
-        {
-            AsyncHelpers.RunSync(() => DiscardAsync(plan));
-        }
-
-        public async Task DiscardAsync<T>(IPlan<T> plan)
-        {
-            await DiscardAsync((IPlan)plan);
-        }
-
-        public void Discard(IPlan plan)
-        {
-            AsyncHelpers.RunSync(() => DiscardAsync(plan));
-        }
-
-        public async Task DiscardAsync(IPlan plan)
-        {
-            var planAsNode = (DefaultNode)plan;
-            planAsNode.Discarded = true;
-            foreach (var plan1 in planAsNode.PlannedCreatedNodes)
-            {
-                var toCreate = (DefaultNode)plan1;
-                var parent = toCreate.ParentPlan;
-                if (parent != null)
-                {
-                    _hierarchy.RemoveChildNode(parent, toCreate);
-                }
-                else
-                {
-                    _hierarchy.RemoveRootNode(toCreate);
-                }
-                toCreate.Parent = null;
-                toCreate.Discarded = true;
-            }
-            var nodeParent = planAsNode.ParentPlan;
-            if (nodeParent != null)
-            {
-                _hierarchy.RemoveChildNode(nodeParent, planAsNode);
-            }
-            else
-            {
-                _hierarchy.RemoveRootNode(planAsNode);
-            }
-
-            if (plan.DiscardOnResolve.Count > 0)
-            {
-                foreach (var child in plan.DiscardOnResolve.ToList())
-                {
-                    _hierarchy.RemoveNode((INode)child);
-                }
-            }
-        }
-
-        public void DiscardAll<T>(IPlan<T>[] plans)
-        {
-            AsyncHelpers.RunSync(() => DiscardAllAsync(plans));
-        }
-
-        public async Task DiscardAllAsync<T>(IPlan<T>[] plans)
-        {
-            foreach (var plan in plans)
-            {
-                await DiscardAsync(plan);
-            }
-        }
-
-        public void DiscardAll(IPlan[] plans)
-        {
-            AsyncHelpers.RunSync(() => DiscardAllAsync(plans));
-        }
-
-        public async Task DiscardAllAsync(IPlan[] plans)
-        {
-            foreach (var plan in plans)
-            {
-                await DiscardAsync(plan);
-            }
-        }
-
-        #endregion
-
-        #region Internals
-
+#if !PLATFORM_UNITY
         private async Task<object> ResolveArgument(DefaultNode toCreate, IUnresolvedArgument argument)
+#else
+        private object ResolveArgument(DefaultNode toCreate, IUnresolvedArgument argument)
+#endif
         {
             switch (argument.ArgumentType)
             {
                 case UnresolvedArgumentType.Type:
                     if (argument.IsMultipleResult)
                     {
+#if !PLATFORM_UNITY
                         var value = (Array)Activator.CreateInstance(argument.MultipleResultElementType.MakeArrayType(), new object[] { argument.PlannedTargets.Length });
                         for (int index = 0; index < argument.PlannedTargets.Length; index++)
+#else
+                        var value = (Array)Activator.CreateInstance(argument.MultipleResultElementType.MakeArrayType(), new object[] { argument.PlannedTargets.Count });
+                        for (int index = 0; index < argument.PlannedTargets.Count; index++)
+#endif
                         {
                             var target = argument.PlannedTargets[index];
 
@@ -841,12 +439,23 @@ namespace Protoinject
             throw new ActivationException("Unexpected argument type", toCreate);
         }
 
+#if !PLATFORM_UNITY
         private async Task<IPlan> CreatePlan(Type requestedType, INode current, string bindingName, string planName,
             INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments,
             Dictionary<Type, List<IMapping>> transientBindings)
+#else
+        private IPlan CreatePlan(Type requestedType, INode current, string bindingName, string planName,
+            INode planRoot, IInjectionAttribute[] injectionAttributes, IConstructorArgument[] arguments,
+            Dictionary<Type, List<IMapping>> transientBindings)
+#endif
         {
+#if !PLATFORM_UNITY
             var plans = await CreatePlans(requestedType, current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings);
             if (plans.Length != 1)
+#else
+            var plans = CreatePlans(requestedType, current, bindingName, planName, planRoot, injectionAttributes, arguments, transientBindings);
+            if (plans.Count != 1)
+#endif
             {
                 foreach (var plan in plans)
                 {
@@ -858,7 +467,11 @@ namespace Protoinject
                 createdNode.Parent = current;
                 createdNode.Planned = true;
 
+#if !PLATFORM_UNITY
                 if (plans.Length == 0)
+#else
+                if (plans.Count == 0)
+#endif
                 {
                     createdNode.InvalidHint = "Expected one binding for '" + requestedType +
                                               "' but no types were bound.";
@@ -875,7 +488,11 @@ namespace Protoinject
             return plans[0];
         }
 
+#if !PLATFORM_UNITY
         private async Task<IPlan[]> CreatePlans(
+#else
+        private List<IPlan> CreatePlans(
+#endif
             Type requestedType, 
             INode current, 
             string bindingName, 
@@ -917,8 +534,14 @@ namespace Protoinject
                 }
 
                 // Add deferred search options based on explicit mappings in the kernel.
+#if !PLATFORM_UNITY
                 var requireResolvedMappings = await ResolveTypes(requestedType, bindingName, current, transientBindings);
                 var requirePlans = (IPlan[])Activator.CreateInstance(typeof(IPlan<>).MakeGenericType(requestedType).MakeArrayType(), 1);
+#else
+                var requireResolvedMappings = ResolveTypes(requestedType, bindingName, current, transientBindings);
+                var requirePlans = new List<IPlan>(1);
+                requirePlans.Add(null);
+#endif
                 foreach (var mapping in requireResolvedMappings)
                 {
                     // The mechanism of adding additional desired types based on the bindings
@@ -939,7 +562,11 @@ namespace Protoinject
                 createdNode.Parent = current;
                 createdNode.Planned = true;
                 createdNode.Deferred = true;
+#if PLATFORM_UNITY
+                createdNode.DeferredSearchOptions = deferredSearchOptions.ToDictionary(k => k.Key, v => v.Value);
+#else
                 createdNode.DeferredSearchOptions = deferredSearchOptions.AsReadOnly();
+#endif
                 createdNode.PlanName = planName;
                 createdNode.PlanRoot = planRoot;
                 createdNode.RequestedType = requestedType;
@@ -953,10 +580,19 @@ namespace Protoinject
             }
 
             // Otherwise, construct plans based on the kernel configuration.
+#if !PLATFORM_UNITY
             var resolvedMappings = await ResolveTypes(requestedType, bindingName, current, transientBindings);
             var plans = (IPlan[])Activator.CreateInstance(typeof(IPlan<>).MakeGenericType(requestedType).MakeArrayType(), resolvedMappings.Length);
+#else
+            var resolvedMappings = ResolveTypes(requestedType, bindingName, current, transientBindings);
+            var plans = new List<IPlan>(resolvedMappings.Length);
+#endif
             for (var i = 0; i < resolvedMappings.Length; i++)
             {
+#if PLATFORM_UNITY
+                plans.Add(null);
+#endif
+
                 var resolvedMapping = resolvedMappings[i];
                 var localPlanRoot = planRoot;
 
@@ -965,7 +601,11 @@ namespace Protoinject
                 var targetNonGeneric = resolvedMapping.Target;
                 if (targetNonGeneric != null && targetNonGeneric.IsGenericTypeDefinition)
                 {
+#if !PLATFORM_UNITY
                     targetNonGeneric = targetNonGeneric.MakeGenericType(requestedType.GenericTypeArguments);
+#else
+                    targetNonGeneric = targetNonGeneric.MakeGenericType(requestedType.GetGenericArguments());
+#endif
                 }
 
                 // Use the current node as the scope, unless the binding overrides the scope.
@@ -997,7 +637,10 @@ namespace Protoinject
                         {
                             // Flag that the plan root is now dependent on the other
                             // plan being resolved.
-                            localPlanRoot?.DependentOnPlans.Add(existing.PlanRoot);
+                            if (localPlanRoot != null)
+                            {
+                                localPlanRoot.DependentOnPlans.Add(existing.PlanRoot);
+                            }
                         }
 
                         plans[i] = existing;
@@ -1069,7 +712,11 @@ namespace Protoinject
                             ? attribute.NotSupportedFullTypeName
                             : attribute.FullTypeName;
 
+#if !PLATFORM_UNITY
                         var resolvedFactoryClass = (await GetTypesForAssembly(createdNode.Type.Assembly))
+#else
+                        var resolvedFactoryClass = (GetTypesForAssembly(createdNode.Type.Assembly))
+#endif
                                 .FirstOrDefault(x => x.FullName == targetName);
                         if (resolvedFactoryClass == null)
                         {
@@ -1084,7 +731,11 @@ namespace Protoinject
                         // If the factory class is generic, pass in type parameters as needed.
                         if (resolvedFactoryClass != null && resolvedFactoryClass.IsGenericTypeDefinition)
                         {
+#if !PLATFORM_UNITY
                             resolvedFactoryClass = resolvedFactoryClass.MakeGenericType(requestedType.GenericTypeArguments);
+#else
+                            resolvedFactoryClass = resolvedFactoryClass.MakeGenericType(requestedType.GetGenericArguments());
+#endif
                         }
 
                         createdNode.Type = resolvedFactoryClass;
@@ -1184,8 +835,8 @@ namespace Protoinject
                             plannedArgument.UnresolvedType = parameters[ii].ParameterType;
                             plannedArgument.InjectionParameters =
                                 parameters[ii].GetCustomAttributes(true).OfType<IInjectionAttribute>().ToArray();
-                            plannedArgument.Name =
-                                plannedArgument.InjectionParameters.OfType<NamedAttribute>().FirstOrDefault()?.Name;
+                            var namedAttribute = plannedArgument.InjectionParameters.OfType<NamedAttribute>().FirstOrDefault();
+                            plannedArgument.Name = namedAttribute == null ? null : namedAttribute.Name;
                         }
 
                         slots[ii] = plannedArgument;
@@ -1200,7 +851,11 @@ namespace Protoinject
                             case UnresolvedArgumentType.Type:
                                 if (argument.IsMultipleResult)
                                 {
+#if !PLATFORM_UNITY
                                     var children = await CreatePlans(
+#else
+                                    var children = CreatePlans(
+#endif
                                         argument.MultipleResultElementType,
                                         createdNode,
                                         argument.Name,
@@ -1220,7 +875,11 @@ namespace Protoinject
                                 }
                                 else
                                 {
+#if !PLATFORM_UNITY
                                     var child = await CreatePlan(
+#else
+                                    var child = CreatePlan(
+#endif
                                         argument.UnresolvedType,
                                         createdNode,
                                         argument.Name,
@@ -1277,7 +936,10 @@ namespace Protoinject
                             {
                                 // Flag that the plan root is now dependent on the other
                                 // plan being resolved.
-                                planRoot?.DependentOnPlans.Add(existing.PlanRoot);
+                                if (planRoot != null)
+                                {
+                                    planRoot.DependentOnPlans.Add(existing.PlanRoot);
+                                }
                             }
 
                             // Set the existing node as the deferred target.
@@ -1319,7 +981,11 @@ namespace Protoinject
             return plans;
         }
 
+#if !PLATFORM_UNITY
         private async Task<Type[]> GetTypesForAssembly(Assembly assembly)
+#else
+        private Type[] GetTypesForAssembly(Assembly assembly)
+#endif
         {
             if (_assemblyTypeCache.ContainsKey(assembly))
             {
@@ -1330,7 +996,11 @@ namespace Protoinject
             return _assemblyTypeCache[assembly];
         }
 
+#if !PLATFORM_UNITY
         private async Task<IMapping[]> ResolveTypes(Type originalType, string name, INode current, Dictionary<Type, List<IMapping>> transientBindings)
+#else
+        private IMapping[] ResolveTypes(Type originalType, string name, INode current, Dictionary<Type, List<IMapping>> transientBindings)
+#endif
         {
             var mappings = new List<IMapping>();
 
@@ -1434,8 +1104,6 @@ namespace Protoinject
             
             return mappings.ToArray();
         }
-
-        #endregion
     }
 }
  

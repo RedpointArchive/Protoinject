@@ -9,8 +9,8 @@ namespace Protoinject
             ChildToResolve = childToResolve;
         }
 
-        public IKernel Kernel { get; }
-        public INode Parent { get; }
-        public IPlan ChildToResolve { get; }
+        public IKernel Kernel { get; private set; }
+        public INode Parent { get; private set; }
+        public IPlan ChildToResolve { get; private set; }
     }
 }

@@ -8,9 +8,9 @@ namespace Protoinject
     /// </summary>
     public class GeneratedFactoryAttribute : Attribute
     {
-        public string FullTypeName { get; }
+        public string FullTypeName { get; private set; }
 
-        public string NotSupportedFullTypeName { get; }
+        public string NotSupportedFullTypeName { get; private set; }
 
         public GeneratedFactoryAttribute(string fullTypeName)
         {

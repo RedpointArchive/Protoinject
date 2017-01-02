@@ -1,4 +1,7 @@
-﻿using System;
+﻿#if PLATFORM_UNITY
+using Protoinject.UnityClasses;
+#endif
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -9,16 +12,41 @@ namespace Protoinject
     {
         private List<INode> _rootNodes;
 
+#if PLATFORM_UNITY
+        private WeakDictionary<object, List<INode>> _lookupCache;
+#else
         private ConditionalWeakTable<object, List<INode>> _lookupCache;
+#endif
 
         public DefaultHierarchy()
         {
             _rootNodes = new List<INode>();
+#if PLATFORM_UNITY
+            _lookupCache = new WeakDictionary<object, List<INode>>();
+#else
             _lookupCache = new ConditionalWeakTable<object, List<INode>>();
+#endif
         }
 
-        IReadOnlyCollection<INode> IHierarchy.RootNodes => _rootNodes.AsReadOnly();
-        public int LookupCacheObjectCount => 0;
+#if PLATFORM_UNITY
+        System.Collections.ObjectModel.ReadOnlyCollection<INode> IHierarchy.RootNodes
+#else
+        System.Collections.Generic.IReadOnlyCollection<INode> IHierarchy.RootNodes
+#endif
+        {
+            get
+            {
+                return _rootNodes.AsReadOnly();
+            }
+        }
+
+        public int LookupCacheObjectCount
+        {
+            get
+            {
+                return 0;
+            }
+        }
 
         public INode Lookup(object obj)
         {
@@ -105,7 +133,7 @@ namespace Protoinject
         {
             if (obj == null)
             {
-                throw new ArgumentNullException(nameof(obj));
+                throw new ArgumentNullException("obj");
             }
 
 #if DEBUG
@@ -128,8 +156,18 @@ namespace Protoinject
         {
             if (node.UntypedValue != null)
             {
+#if PLATFORM_UNITY
+                List<INode> list;
+                if (!_lookupCache.TryGetValue(node.UntypedValue, out list))
+                {
+                    _lookupCache.Add(node.UntypedValue, new List<INode>());
+                }
+
+                _lookupCache[node.UntypedValue].Add(node);
+#else
                 var list = _lookupCache.GetOrCreateValue(node.UntypedValue);
                 list.Add(node);
+#endif
             }
 
             foreach (var child in node.Children)

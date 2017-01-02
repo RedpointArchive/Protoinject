@@ -5,13 +5,10 @@ namespace Protoinject
 {
     public static class NodeExtensions
     {
-        public static string GetDebugRepresentation(this IPlan current, string indent = null)
+        public static string GetDebugRepresentation(this IPlan currentPlan, string indent = null)
         {
-            return ((INode) current).GetDebugRepresentation(indent);
-        }
+            var current = (INode)currentPlan;
 
-        public static string GetDebugRepresentation(this INode current, string indent = null)
-        {
             indent = indent ?? string.Empty;
             if (current == null)
             {
@@ -26,7 +23,7 @@ namespace Protoinject
             {
                 if (current.Deferred)
                 {
-                    if (!string.IsNullOrWhiteSpace(current.PlanName))
+                    if (!string.IsNullOrEmpty(current.PlanName))
                     {
                         me += " **DEFERRED (as '" + current.PlanName + "')**";
                     }
@@ -37,7 +34,7 @@ namespace Protoinject
                 }
                 else
                 {
-                    if (!string.IsNullOrWhiteSpace(current.PlanName))
+                    if (!string.IsNullOrEmpty(current.PlanName))
                     {
                         me += " **PLANNED (as '" + current.PlanName + "')**";
                     }

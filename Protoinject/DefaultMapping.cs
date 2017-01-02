@@ -35,7 +35,7 @@ namespace Protoinject
         public bool UniquePerScope { get; internal set; }
         public bool DiscardNodeOnResolve { get; internal set; }
         public string Named { get; internal set; }
-        public bool Valid => true;
+        public bool Valid { get { return true; } }
         public bool TargetFactory { get; internal set; }
         public bool TargetFactoryNotSupported { get; internal set; }
     }

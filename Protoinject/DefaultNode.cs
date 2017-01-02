@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+#if PLATFORM_UNITY
+using System.Collections.ObjectModel;
+#endif
 using System.Linq;
 using System.Reflection;
 
@@ -47,12 +50,18 @@ namespace Protoinject
         internal void AddChild(INode node)
         {
             _childrenInternal.Add(node);
-            ChildrenChanged?.Invoke(this, new EventArgs());
+            if (ChildrenChanged != null)
+            {
+                ChildrenChanged.Invoke(this, new EventArgs());
+            }
 
             var a = this;
             while (a != null)
             {
-                a.DescendantsChanged?.Invoke(this, new EventArgs());
+                if (a.DescendantsChanged != null)
+                {
+                    a.DescendantsChanged.Invoke(this, new EventArgs());
+                }
                 a = (DefaultNode) a.Parent;
             }
         }
@@ -60,12 +69,18 @@ namespace Protoinject
         internal void RemoveChild(INode node)
         {
             _childrenInternal.Remove(node);
-            ChildrenChanged?.Invoke(this, new EventArgs());
+            if (ChildrenChanged != null)
+            {
+                ChildrenChanged.Invoke(this, new EventArgs());
+            }
 
             var a = this;
             while (a != null)
             {
-                a.DescendantsChanged?.Invoke(this, new EventArgs());
+                if (a.DescendantsChanged != null)
+                {
+                    a.DescendantsChanged.Invoke(this, new EventArgs());
+                }
                 a = (DefaultNode)a.Parent;
             }
         }
@@ -73,14 +88,24 @@ namespace Protoinject
         public INode Parent { get; set; }
         public string Name { get; set; }
 
-        public IReadOnlyCollection<INode> Children => _childrenInternal.AsReadOnly();
+#if PLATFORM_UNITY
+        public ReadOnlyCollection<INode> Children
+#else
+        public IReadOnlyCollection<INode> Children
+#endif
+        {
+            get
+            {
+                return _childrenInternal.AsReadOnly();
+            }
+        }
         
         public event ValueChangedEventHandler ValueChanged;
         public event EventHandler ChildrenChanged;
         public event EventHandler DescendantsChanged;
 
-        public List<IPlan> PlannedCreatedNodes { get; }
-        public List<IPlan> DeferredCreatedNodes { get; }
+        public List<IPlan> PlannedCreatedNodes { get; private set; }
+        public List<IPlan> DeferredCreatedNodes { get; private set; }
 
         public string FullName
         {
@@ -89,13 +114,13 @@ namespace Protoinject
                 return
                     GetParents()
                         .Concat(new[] {this})
-                        .Select(x => string.IsNullOrWhiteSpace(x.Name) ? (x.Type == null ? "(unknown)" : ("(" + x.Type.FullName + ")")) : x.Name)
+                        .Select(x => string.IsNullOrEmpty(x.Name) ? (x.Type == null ? "(unknown)" : ("(" + x.Type.FullName + ")")) : x.Name)
                         .Aggregate((a, b) => a + "/" + b);
             }
         }
 
         public IPlan PlanRoot { get; set; }
-        public List<IPlan> DependentOnPlans { get; }
+        public List<IPlan> DependentOnPlans { get; private set; }
         public bool Discarded { get; set; }
 
         public bool Valid
@@ -121,14 +146,21 @@ namespace Protoinject
                     var oldValue = _untypedValue;
                     _untypedValue = value;
                     _valueChanged = true;
-                    ValueChanged?.Invoke(this, new ValueChangedEventArgs {OldValue = oldValue, NewValue = _untypedValue});
+                    if (ValueChanged != null)
+                    {
+                        ValueChanged.Invoke(this, new ValueChangedEventArgs { OldValue = oldValue, NewValue = _untypedValue });
+                    }
                 }
             }
         }
 
         public Type Type { get; set; }
 
+#if PLATFORM_UNITY
+        public ReadOnlyCollection<INode> GetParents()
+#else
         public IReadOnlyCollection<INode> GetParents()
+#endif
         {
             var parents = new List<INode>();
             var current = Parent;
@@ -149,7 +181,18 @@ namespace Protoinject
             get { return Parent; }
         }
 
-        public IReadOnlyCollection<IPlan> ChildrenPlan => Children;
+#if PLATFORM_UNITY
+        public ReadOnlyCollection<INode> ChildrenPlan
+#else
+        public IReadOnlyCollection<IPlan> ChildrenPlan
+#endif
+        {
+            get
+            {
+                return _childrenInternal.AsReadOnly();
+            }
+        }
+
         public ConstructorInfo PlannedConstructor { get; set; }
 
         public List<IUnresolvedArgument> PlannedConstructorArguments { get; set; }
@@ -157,7 +200,11 @@ namespace Protoinject
         public Func<IContext, object> PlannedMethod { get; set; }
 
         public bool Deferred { get; set; }
+#if PLATFORM_UNITY
+        public Dictionary<Type, INode> DeferredSearchOptions { get; set; }
+#else
         public IReadOnlyCollection<KeyValuePair<Type, INode>> DeferredSearchOptions { get; set; }
+#endif
         public INode DeferredResolvedTarget { get; set; }
         public Type RequestedType { get; set; }
 

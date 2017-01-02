@@ -63,20 +63,6 @@ namespace Protoinject
             return kernel.Plan(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings);
         }
 
-        public static IPlan<T>[] PlanAll<T>(this IKernel kernel, INode current, string bindingName, string planName,
-            IInjectionAttribute[] injectionAttributes, Dictionary<Type, List<IMapping>> transientBindings,
-            params IConstructorArgument[] arguments)
-        {
-            return kernel.PlanAll<T>(current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-        }
-
-        public static IPlan[] PlanAll(this IKernel kernel, Type type, INode current, string bindingName, string planName,
-            IInjectionAttribute[] injectionAttributes, Dictionary<Type, List<IMapping>> transientBindings,
-            params IConstructorArgument[] arguments)
-        {
-            return kernel.PlanAll(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings);
-        }
-
         public static T Get<T>(this IKernel kernel, INode current, string bindingName, string planName,
             IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
         {
@@ -125,6 +111,21 @@ namespace Protoinject
             return kernel.Plan(type, current, bindingName, planName, injectionAttributes, arguments, null);
         }
 
+#if !PLATFORM_UNITY
+        public static IPlan<T>[] PlanAll<T>(this IKernel kernel, INode current, string bindingName, string planName,
+            IInjectionAttribute[] injectionAttributes, Dictionary<Type, List<IMapping>> transientBindings,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.PlanAll<T>(current, bindingName, planName, injectionAttributes, arguments, transientBindings);
+        }
+
+        public static IPlan[] PlanAll(this IKernel kernel, Type type, INode current, string bindingName, string planName,
+            IInjectionAttribute[] injectionAttributes, Dictionary<Type, List<IMapping>> transientBindings,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.PlanAll(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings);
+        }
+
         public static IPlan<T>[] PlanAll<T>(this IKernel kernel, INode current, string bindingName, string planName,
             IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
         {
@@ -136,6 +137,33 @@ namespace Protoinject
         {
             return kernel.PlanAll(type, current, bindingName, planName, injectionAttributes, arguments, null);
         }
+#else
+        public static List<IPlan<T>> PlanAll<T>(this IKernel kernel, INode current, string bindingName, string planName,
+            IInjectionAttribute[] injectionAttributes, Dictionary<Type, List<IMapping>> transientBindings,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.PlanAll<T>(current, bindingName, planName, injectionAttributes, arguments, transientBindings);
+        }
+
+        public static List<IPlan> PlanAll(this IKernel kernel, Type type, INode current, string bindingName, string planName,
+            IInjectionAttribute[] injectionAttributes, Dictionary<Type, List<IMapping>> transientBindings,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.PlanAll(type, current, bindingName, planName, injectionAttributes, arguments, transientBindings);
+        }
+
+        public static List<IPlan<T>> PlanAll<T>(this IKernel kernel, INode current, string bindingName, string planName,
+            IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
+        {
+            return kernel.PlanAll<T>(current, bindingName, planName, injectionAttributes, arguments, null);
+        }
+
+        public static List<IPlan> PlanAll(this IKernel kernel, Type type, INode current, string bindingName, string planName,
+            IInjectionAttribute[] injectionAttributes, params IConstructorArgument[] arguments)
+        {
+            return kernel.PlanAll(type, current, bindingName, planName, injectionAttributes, arguments, null);
+        }
+#endif
 
         #endregion
 
@@ -283,6 +311,6 @@ namespace Protoinject
             return kernel.Bind(@interface);
         }
 
-        #endregion
+#endregion
     }
 }

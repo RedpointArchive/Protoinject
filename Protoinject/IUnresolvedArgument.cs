@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Protoinject
 {
@@ -12,7 +13,11 @@ namespace Protoinject
         object FactoryArgumentValue { get; }
         Delegate FactoryDelegate { get; }
         IPlan PlannedTarget { get; }
+#if !PLATFORM_UNITY
         IPlan[] PlannedTargets { get; }
+#else
+        List<IPlan> PlannedTargets { get; }
+#endif
         object KnownValue { get; }
         bool IsMultipleResult { get; }
         Type MultipleResultElementType { get; }
