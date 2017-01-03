@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+#if PLATFORM_UNITY
+using System.Collections.ObjectModel;
+#endif
 
 namespace Protoinject
 {
@@ -9,13 +12,21 @@ namespace Protoinject
 
         string Name { get; set; }
 
+#if PLATFORM_UNITY
+        ReadOnlyCollection<INode> Children { get; }
+#else
         IReadOnlyCollection<INode> Children { get; }
+#endif
 
         object UntypedValue { get; }
 
         Type Type { get; }
 
+#if PLATFORM_UNITY
+        ReadOnlyCollection<INode> GetParents();
+#else
         IReadOnlyCollection<INode> GetParents();
+#endif
 
         event ValueChangedEventHandler ValueChanged;
 

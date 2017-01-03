@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+#if PLATFORM_UNITY
+using System.Collections.ObjectModel;
+#endif
 using System.Net.Configuration;
 using System.Reflection;
 
@@ -11,7 +14,11 @@ namespace Protoinject
 
         bool Deferred { get; }
 
+#if !PLATFORM_UNITY
         IReadOnlyCollection<KeyValuePair<Type, INode>> DeferredSearchOptions { get; }
+#else
+        Dictionary<Type, INode> DeferredSearchOptions { get; }
+#endif
 
         INode DeferredResolvedTarget { get; }
 
@@ -19,7 +26,11 @@ namespace Protoinject
 
         IPlan ParentPlan { get; }
 
+#if !PLATFORM_UNITY
         IReadOnlyCollection<IPlan> ChildrenPlan { get; }
+#else
+        ReadOnlyCollection<INode> ChildrenPlan { get; }
+#endif
 
         ConstructorInfo PlannedConstructor { get; }
 

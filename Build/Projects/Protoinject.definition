@@ -52,6 +52,10 @@
     </Compile>
     <Compile Include="ScopeAttribute.cs" />
     <Compile Include="StandardKernel.cs" />
+    <Compile Include="StandardKernel.Default.cs" />
+    <Compile Include="StandardKernel.Unity.cs" />
+    <Compile Include="UnityClasses\UnityExtensions.cs" />
+    <Compile Include="UnityClasses\WeakDictionary.cs" />
     <Compile Include="UnresolvedArgumentType.cs" />
     <Compile Include="ValueChangedEventArgs.cs" />
     <Compile Include="ValueChangedEventHandler.cs" />

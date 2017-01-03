@@ -1,10 +1,12 @@
-﻿using System.Collections.Generic;
-
-namespace Protoinject
+﻿namespace Protoinject
 {
     public interface IHierarchy
     {
-        IReadOnlyCollection<INode> RootNodes { get; }
+#if PLATFORM_UNITY
+        System.Collections.ObjectModel.ReadOnlyCollection<INode> RootNodes { get; }
+#else
+        System.Collections.Generic.IReadOnlyCollection<INode> RootNodes { get; }
+#endif
 
         int LookupCacheObjectCount { get; }
 

@@ -14,6 +14,12 @@ namespace Protoinject.Example
             _name = name;
         }
 
-        public string Name => _name;
+        public string Name
+        {
+            get
+            {
+                return _name;
+            }
+        }
     }
 }
