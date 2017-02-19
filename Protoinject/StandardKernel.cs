@@ -339,6 +339,12 @@ namespace Protoinject
                         }
 
                         toCreate.PlannedConstructor.Invoke(toCreate.UntypedValue, parameters.ToArray());
+
+                        var asyncConstructable = toCreate.UntypedValue as IAsynchronouslyConstructable;
+                        if (asyncConstructable != null)
+                        {
+                            await asyncConstructable.ConstructAsync();
+                        }
                     }
                     catch (TargetInvocationException ex)
                     {

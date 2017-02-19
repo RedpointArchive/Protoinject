@@ -18,6 +18,7 @@
     <Compile Include="FixedScope.cs" />
     <Compile Include="GeneratedFactoryAttribute.cs" />
     <Compile Include="GetScopeFromContext.cs" />
+    <Compile Include="IAsynchronouslyConstructable.cs" />
     <Compile Include="IBindInScope.cs" />
     <Compile Include="IBindInScopeOrUnique.cs" />
     <Compile Include="IBindInScopeWithDescendantFilterOrUnique.cs" />
