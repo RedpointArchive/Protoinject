@@ -113,6 +113,12 @@ namespace Protoinject.FactoryGenerator
                 x.Parameters[1].ParameterType.Name == "INode" &&
                 x.Parameters[2].ParameterType.Name == "String" &&
                 x.Parameters[3].ParameterType.Name == "String"));
+            var kernelGetAsync = assembly.MainModule.Import(iKernelDef.GetMethods().First(x =>
+                x.Name == "GetAsync" &&
+                x.Parameters.Count == 6 &&
+                x.Parameters[0].ParameterType.Name == "INode" &&
+                x.Parameters[1].ParameterType.Name == "String" &&
+                x.Parameters[2].ParameterType.Name == "String"));
             var generatedFactoryAttributeConstructor = assembly.MainModule.Import(
                 FindTypeInModuleOrReferences(assembly, "Protoinject.GeneratedFactoryAttribute").GetConstructors()
                 .First(x => x.Parameters.Count == 2));
@@ -214,12 +220,27 @@ namespace Protoinject.FactoryGenerator
                         impl.Parameters.Add(new ParameterDefinition(p.ParameterType) { Name = p.Name });
                     }
 
+                    var realReturnType = method.ReturnType;
+                    var kernelGetMethod = kernelGet;
+                    var isAsynchronous = false;
+                    if (method.ReturnType.FullName.StartsWith("System.Threading.Tasks.Task`1"))
+                    {
+                        realReturnType = ((GenericInstanceType)method.ReturnType).GenericArguments.First();
+                        var genericMethodInstance = new GenericInstanceMethod(kernelGetAsync);
+                        genericMethodInstance.GenericArguments.Add(realReturnType);
+                        kernelGetMethod = genericMethodInstance;
+                        isAsynchronous = true;
+                    }
+
                     impl.Body.InitLocals = true;
 
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldarg_0));
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldfld, kernelField));
-                    impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldtoken, impl.ReturnType));
-                    impl.Body.Instructions.Add(Instruction.Create(OpCodes.Call, getTypeFromHandle));
+                    if (!isAsynchronous)
+                    {
+                        impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldtoken, realReturnType));
+                        impl.Body.Instructions.Add(Instruction.Create(OpCodes.Call, getTypeFromHandle));
+                    }
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldarg_0));
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldfld, currentField));
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldnull));
@@ -247,7 +268,7 @@ namespace Protoinject.FactoryGenerator
                     
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ldnull));
 
-                    impl.Body.Instructions.Add(Instruction.Create(OpCodes.Callvirt, kernelGet));
+                    impl.Body.Instructions.Add(Instruction.Create(OpCodes.Callvirt, kernelGetMethod));
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Castclass, method.ReturnType));
                     impl.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
                 }
