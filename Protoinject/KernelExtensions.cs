@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+#if !PLATFORM_UNITY
+using System.Threading.Tasks;
+#endif
 
 namespace Protoinject
 {
@@ -298,7 +301,141 @@ namespace Protoinject
         {
             return kernel.GetAll(type, current, null, null, new IInjectionAttribute[0], arguments, null);
         }
-        
+
+#if !PLATFORM_UNITY
+
+        public static Task<T> GetAsync<T>(this IKernel kernel, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAsync<T>(null, null, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<T> GetAsync<T>(this IKernel kernel, string bindingName, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAsync<T>(null, bindingName, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<T> GetAsync<T>(this IKernel kernel, INode current, string bindingName,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAsync<T>(current, bindingName, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<T> GetAsync<T>(this IKernel kernel, INode current, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAsync<T>(current, null, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<object> GetAsync(this IKernel kernel, Type type, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAsync(type, null, null, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<object> GetAsync(this IKernel kernel, Type type, string bindingName,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAsync(type, null, bindingName, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<object> GetAsync(this IKernel kernel, Type type, INode current, string bindingName,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAsync(type, current, bindingName, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<object> GetAsync(this IKernel kernel, Type type, INode current, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAsync(type, current, null, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<T> TryGetAsync<T>(this IKernel kernel, params IConstructorArgument[] arguments)
+        {
+            return kernel.TryGetAsync<T>(null, null, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<T> TryGetAsync<T>(this IKernel kernel, string bindingName, params IConstructorArgument[] arguments)
+        {
+            return kernel.TryGetAsync<T>(null, bindingName, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<T> TryGetAsync<T>(this IKernel kernel, INode current, string bindingName,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.TryGetAsync<T>(current, bindingName, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<T> TryGetAsync<T>(this IKernel kernel, INode current, params IConstructorArgument[] arguments)
+        {
+            return kernel.TryGetAsync<T>(current, null, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<object> TryGetAsync(this IKernel kernel, Type type, params IConstructorArgument[] arguments)
+        {
+            return kernel.TryGetAsync(type, null, null, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<object> TryGetAsync(this IKernel kernel, Type type, string bindingName,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.TryGetAsync(type, null, bindingName, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<object> TryGetAsync(this IKernel kernel, Type type, INode current, string bindingName,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.TryGetAsync(type, current, bindingName, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<object> TryGetAsync(this IKernel kernel, Type type, INode current,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.TryGetAsync(type, current, null, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<T[]> GetAllAsync<T>(this IKernel kernel, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAllAsync<T>(null, null, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<T[]> GetAllAsync<T>(this IKernel kernel, string bindingName, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAllAsync<T>(null, bindingName, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<T[]> GetAllAsync<T>(this IKernel kernel, INode current, string bindingName,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAllAsync<T>(current, bindingName, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<T[]> GetAllAsync<T>(this IKernel kernel, INode current, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAllAsync<T>(current, null, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<object[]> GetAllAsync(this IKernel kernel, Type type, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAllAsync(type, null, null, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<object[]> GetAllAsync(this IKernel kernel, Type type, string bindingName,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAllAsync(type, null, bindingName, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<object[]> GetAllAsync(this IKernel kernel, Type type, INode current, string bindingName,
+            params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAllAsync(type, current, bindingName, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+        public static Task<object[]> GetAllAsync(this IKernel kernel, Type type, INode current, params IConstructorArgument[] arguments)
+        {
+            return kernel.GetAllAsync(type, current, null, null, new IInjectionAttribute[0], arguments, null);
+        }
+
+#endif
+
         public static IBindToInScopeWithDescendantFilterOrUniqueOrNamed<T> Rebind<T>(this IKernel kernel)
         {
             kernel.Unbind<T>();
