@@ -74,14 +74,14 @@ namespace Protoinject.FactoryGenerator
                     Path.GetFileNameWithoutExtension(args[0]) + ".pdb")) ||
                 File.Exists(Path.Combine(Path.GetDirectoryName(args[0]),
                     Path.GetFileNameWithoutExtension(args[0]) + ".dll.mdb"));
-            var assembly = AssemblyDefinition.ReadAssembly(args[0], new ReaderParameters {ReadSymbols = readSymbols, AssemblyResolver = resolver});
+            var assembly = AssemblyDefinition.ReadAssembly(args[0], new ReaderParameters {ReadSymbols = readSymbols, AssemblyResolver = resolver, InMemory = true });
             Console.WriteLine("Generating factories for " + assembly.FullName + "...");
             
             TypeReference iGenerateFactory;
             try
             {
                 iGenerateFactory =
-                    assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.IGenerateFactory"));
+                    assembly.MainModule.ImportReference(FindTypeInModuleOrReferences(assembly, "Protoinject.IGenerateFactory"));
             }
             catch (Exception ex)
             {
@@ -91,46 +91,46 @@ namespace Protoinject.FactoryGenerator
                 return;
             }
 
-            var iNode = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.INode"));
+            var iNode = assembly.MainModule.ImportReference(FindTypeInModuleOrReferences(assembly, "Protoinject.INode"));
             var iKernelDef = FindTypeInModuleOrReferences(assembly, "Protoinject.IKernel");
             var iCurrentNodeDef = FindTypeInModuleOrReferences(assembly, "Protoinject.ICurrentNode");
             var @object = assembly.MainModule.TypeSystem.Object;
             var @string = assembly.MainModule.TypeSystem.String;
-            var objectConstructor = assembly.MainModule.Import(assembly.MainModule.TypeSystem.Object.Resolve().GetConstructors().First());
+            var objectConstructor = assembly.MainModule.ImportReference(assembly.MainModule.TypeSystem.Object.Resolve().GetConstructors().First());
             var getNodeForFactoryImplementation = 
-                assembly.MainModule.Import(iCurrentNodeDef.GetMethods().First(x => x.Name == "GetNodeForFactoryImplementation"));
-            var getTypeFromHandle = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "System.Type").GetMethods().First(x => x.Name == "GetTypeFromHandle"));
-            var notSupportedExceptionCtor = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "System.NotSupportedException").GetConstructors().First(x => x.Parameters.Count == 0));
-            var iConstructorArgument = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.IConstructorArgument"));
-            var iInjectionAttribute = assembly.MainModule.Import(FindTypeInModuleOrReferences(assembly, "Protoinject.IInjectionAttribute"));
-            var namedConstructorArgumentConstructor = assembly.MainModule.Import(
+                assembly.MainModule.ImportReference(iCurrentNodeDef.GetMethods().First(x => x.Name == "GetNodeForFactoryImplementation"));
+            var getTypeFromHandle = assembly.MainModule.ImportReference(FindTypeInModuleOrReferences(assembly, "System.Type").GetMethods().First(x => x.Name == "GetTypeFromHandle"));
+            var notSupportedExceptionCtor = assembly.MainModule.ImportReference(FindTypeInModuleOrReferences(assembly, "System.NotSupportedException").GetConstructors().First(x => x.Parameters.Count == 0));
+            var iConstructorArgument = assembly.MainModule.ImportReference(FindTypeInModuleOrReferences(assembly, "Protoinject.IConstructorArgument"));
+            var iInjectionAttribute = assembly.MainModule.ImportReference(FindTypeInModuleOrReferences(assembly, "Protoinject.IInjectionAttribute"));
+            var namedConstructorArgumentConstructor = assembly.MainModule.ImportReference(
                 FindTypeInModuleOrReferences(assembly, "Protoinject.NamedConstructorArgument")
                 .GetConstructors().First());
-            var kernelGet = assembly.MainModule.Import(iKernelDef.GetMethods().First(x => 
+            var kernelGet = assembly.MainModule.ImportReference(iKernelDef.GetMethods().First(x => 
                 x.Name == "Get" &&
                 x.Parameters.Count == 7 &&
                 x.Parameters[0].ParameterType.Name == "Type" &&
                 x.Parameters[1].ParameterType.Name == "INode" &&
                 x.Parameters[2].ParameterType.Name == "String" &&
                 x.Parameters[3].ParameterType.Name == "String"));
-            var kernelGetAsync = assembly.MainModule.Import(iKernelDef.GetMethods().First(x =>
+            var kernelGetAsync = assembly.MainModule.ImportReference(iKernelDef.GetMethods().First(x =>
                 x.Name == "GetAsync" &&
                 x.Parameters.Count == 6 &&
                 x.Parameters[0].ParameterType.Name == "INode" &&
                 x.Parameters[1].ParameterType.Name == "String" &&
                 x.Parameters[2].ParameterType.Name == "String"));
-            var generatedFactoryAttributeConstructor = assembly.MainModule.Import(
+            var generatedFactoryAttributeConstructor = assembly.MainModule.ImportReference(
                 FindTypeInModuleOrReferences(assembly, "Protoinject.GeneratedFactoryAttribute").GetConstructors()
                 .First(x => x.Parameters.Count == 2));
 
-            var iCurrentNode = assembly.MainModule.Import(iCurrentNodeDef);
-            var iKernel = assembly.MainModule.Import(iKernelDef);
+            var iCurrentNode = assembly.MainModule.ImportReference(iCurrentNodeDef);
+            var iKernel = assembly.MainModule.ImportReference(iKernelDef);
 
             var modified = false;
 
             var types = from module in assembly.Modules
                 from type in module.Types
-                where type.IsInterface && type.Interfaces.Any(x => x.FullName == iGenerateFactory.FullName)
+                where type.IsInterface && type.Interfaces.Any(x => x.InterfaceType.FullName == iGenerateFactory.FullName)
                 select type;
             foreach (var type in types.ToList())
             {
@@ -160,11 +160,11 @@ namespace Protoinject.FactoryGenerator
                 
                 if (supportedFactory.GenericParameters.Count > 0)
                 {
-                    supportedFactory.Interfaces.Add(type.MakeGenericInstanceType(supportedFactory.GenericParameters.Cast<TypeReference>().ToArray()));
+                    supportedFactory.Interfaces.Add(new InterfaceImplementation(type.MakeGenericInstanceType(supportedFactory.GenericParameters.Cast<TypeReference>().ToArray())));
                 }
                 else
                 {
-                    supportedFactory.Interfaces.Add(type);
+                    supportedFactory.Interfaces.Add(new InterfaceImplementation(type));
                 }
 
                 var currentField = new FieldDefinition("_current", FieldAttributes.Private | FieldAttributes.InitOnly, iNode);
@@ -178,7 +178,7 @@ namespace Protoinject.FactoryGenerator
                     MethodAttributes.Public | MethodAttributes.CompilerControlled |
                         MethodAttributes.SpecialName | MethodAttributes.HideBySig |
                         MethodAttributes.RTSpecialName,
-                    type.Module.Import(typeof(void)));
+                    type.Module.ImportReference(typeof(void)));
                 ctor.Body.InitLocals = true;
                 supportedFactory.Methods.Add(ctor);
 
@@ -291,11 +291,11 @@ namespace Protoinject.FactoryGenerator
 
                 if (notSupportedFactory.GenericParameters.Count > 0)
                 {
-                    notSupportedFactory.Interfaces.Add(type.MakeGenericInstanceType(notSupportedFactory.GenericParameters.Cast<TypeReference>().ToArray()));
+                    notSupportedFactory.Interfaces.Add(new InterfaceImplementation(type.MakeGenericInstanceType(notSupportedFactory.GenericParameters.Cast<TypeReference>().ToArray())));
                 }
                 else
                 {
-                    notSupportedFactory.Interfaces.Add(type);
+                    notSupportedFactory.Interfaces.Add(new InterfaceImplementation(type));
                 }
 
                 ctor = new MethodDefinition(
@@ -303,7 +303,7 @@ namespace Protoinject.FactoryGenerator
                     MethodAttributes.Public | MethodAttributes.CompilerControlled |
                         MethodAttributes.SpecialName | MethodAttributes.HideBySig |
                         MethodAttributes.RTSpecialName,
-                    type.Module.Import(typeof(void)));
+                    type.Module.ImportReference(typeof(void)));
                 ctor.Body.InitLocals = true;
                 notSupportedFactory.Methods.Add(ctor);
 
