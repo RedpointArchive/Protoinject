@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 #if !PLATFORM_UNITY
 using System.Runtime.ExceptionServices;
+using System.Collections.ObjectModel;
 #endif
 #if !PLATFORM_UNITY
 using System.Threading.Tasks;
@@ -35,6 +36,12 @@ namespace Protoinject
         public IHierarchy Hierarchy
         {
             get { return _hierarchy; }
+        }
+
+        public IReadOnlyDictionary<Type, IReadOnlyList<IMapping>> GetCopyOfBindings()
+        {
+            var copyDict = _bindings.ToDictionary(k => k.Key, v => (IReadOnlyList<IMapping>)v.Value);
+            return new ReadOnlyDictionary<Type, IReadOnlyList<IMapping>>(copyDict);
         }
 
         public void Load<T>() where T : IProtoinjectModule
@@ -91,6 +98,25 @@ namespace Protoinject
         public void Unbind(Type @interface)
         {
             _bindings[@interface] = new List<IMapping>();
+        }
+
+        public void UnbindSpecific<T>(Func<IMapping, bool> unbindFilter)
+        {
+            UnbindSpecific(typeof(T), unbindFilter);
+        }
+
+        public void UnbindSpecific(Type type, Func<IMapping, bool> unbindFilter)
+        {
+            if (_bindings.ContainsKey(type))
+            {
+                foreach (var b in _bindings[type].ToArray())
+                {
+                    if (unbindFilter(b))
+                    {
+                        _bindings[type].Remove(b);
+                    }
+                }
+            }
         }
 
         public IScope CreateScopeFromNode(INode node)
