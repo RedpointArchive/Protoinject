@@ -10,6 +10,8 @@ namespace Protoinject
     public interface IKernel
     {
         IHierarchy Hierarchy { get; }
+        IDynamicResolutionFallback DynamicResolutionFallback { get; set; }
+
         IBindToInScopeWithDescendantFilterOrUniqueOrNamed<TInterface> Bind<TInterface>();
         IBindToInScopeWithDescendantFilterOrUniqueOrNamed Bind(Type @interface);
         void Unbind<T>();

@@ -24,18 +24,24 @@ namespace Protoinject
 
         private IScope _singletonScope;
 
-        private Dictionary<Assembly, Type[]> _assemblyTypeCache;
+        private Dictionary<string, Type> _assemblyTypeCache;
 
         public StandardKernel()
         {
             _bindings = new Dictionary<Type, List<IMapping>>();
             _hierarchy = new DefaultHierarchy();
-            _assemblyTypeCache = new Dictionary<Assembly, Type[]>();
+            _assemblyTypeCache = new Dictionary<string, Type>();
         }
 
         public IHierarchy Hierarchy
         {
             get { return _hierarchy; }
+        }
+
+        public IDynamicResolutionFallback DynamicResolutionFallback
+        {
+            get;
+            set;
         }
 
         public IReadOnlyDictionary<Type, IReadOnlyList<IMapping>> GetCopyOfBindings()
@@ -745,11 +751,10 @@ namespace Protoinject
                             : attribute.FullTypeName;
 
 #if !PLATFORM_UNITY
-                        var resolvedFactoryClass = (await GetTypesForAssembly(createdNode.Type.Assembly))
+                        var resolvedFactoryClass = (await GetTypeForAssembly(createdNode.Type.Assembly, targetName));
 #else
-                        var resolvedFactoryClass = (GetTypesForAssembly(createdNode.Type.Assembly))
+                        var resolvedFactoryClass = (GetTypeForAssembly(createdNode.Type.Assembly, targetName));
 #endif
-                                .FirstOrDefault(x => x.FullName == targetName);
                         if (resolvedFactoryClass == null)
                         {
                             // This node won't be valid because it's planned, has no value and
@@ -1014,18 +1019,20 @@ namespace Protoinject
         }
 
 #if !PLATFORM_UNITY
-        private async Task<Type[]> GetTypesForAssembly(Assembly assembly)
+        private async Task<Type> GetTypeForAssembly(Assembly assembly, string fullName)
 #else
-        private Type[] GetTypesForAssembly(Assembly assembly)
+        private Type GetTypeForAssembly(Assembly assembly, string fullName)
 #endif
         {
-            if (_assemblyTypeCache.ContainsKey(assembly))
+            var key = assembly.FullName + ":" + fullName;
+            
+            if (_assemblyTypeCache.ContainsKey(key))
             {
-                return _assemblyTypeCache[assembly];
+                return _assemblyTypeCache[key];
             }
 
-            _assemblyTypeCache[assembly] = assembly.GetTypes();
-            return _assemblyTypeCache[assembly];
+            _assemblyTypeCache[key] = assembly.GetType(fullName, false);
+            return _assemblyTypeCache[key];
         }
 
 #if !PLATFORM_UNITY
@@ -1120,6 +1127,18 @@ namespace Protoinject
                         mappings.Add(b);
                     }
                 }
+            }
+
+            if (mappings.Count == 0 && DynamicResolutionFallback != null)
+            {
+                // Fallback to dynamic resolution.
+                mappings.Add(new DefaultMapping
+                {
+                    TargetMethod = ctx =>
+                    {
+                        return DynamicResolutionFallback.GetInstance(originalType);
+                    }
+                });
             }
 
             if (mappings.Count == 0)
