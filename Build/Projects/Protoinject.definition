@@ -30,6 +30,7 @@
     <Compile Include="IConstructorArgument.cs" />
     <Compile Include="IContext.cs" />
     <Compile Include="ICurrentNode.cs" />
+    <Compile Include="IDynamicResolutionFallback.cs" />
     <Compile Include="IGenerateFactory.cs" />
     <Compile Include="IHierarchy.cs" />
     <Compile Include="IInjectionAttribute.cs" />
